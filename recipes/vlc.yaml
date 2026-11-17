@@ -1,0 +1,12 @@
+id: vlc
+name: VLC media player
+locations:
+  windows: "{appdata}/vlc"
+  macos: "{preferences}/org.videolan.vlc"
+files:
+  - path: vlcrc
+    format: ini
+  # Qt interface settings; Windows only, skipped where missing.
+  - path: vlc-qt-interface.ini
+    format: ini
+cross_os: true

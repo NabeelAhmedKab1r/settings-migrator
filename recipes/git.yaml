@@ -1,0 +1,14 @@
+id: git
+name: Git
+locations:
+  windows: "{home}"
+  macos: "{home}"
+files:
+  - path: .gitconfig
+    format: ini
+  - path: .config/git/config
+    format: ini
+  - path: .config/git/ignore
+  - path: .config/git/attributes
+# .git-credentials holds tokens and is never captured (the engine denylist blocks it too).
+cross_os: true

@@ -1,0 +1,19 @@
+id: vscode
+name: Visual Studio Code
+locations:
+  windows: "{appdata}/Code/User"
+  macos: "{app_support}/Code/User"
+files:
+  - path: settings.json
+    format: json
+  - path: keybindings.json
+    format: json
+    translate: [modifier-keys]
+  - path: snippets/
+exclude:
+  - globalStorage/
+  - workspaceStorage/
+extensions:
+  list: "code --list-extensions"
+  install: "code --install-extension {id}"
+cross_os: true

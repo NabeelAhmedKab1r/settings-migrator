@@ -12,4 +12,6 @@ name = "settings-migrator"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
 settings-migrator-engine.workspace = true

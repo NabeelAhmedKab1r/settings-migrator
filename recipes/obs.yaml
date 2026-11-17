@@ -1,0 +1,19 @@
+id: obs
+name: OBS Studio
+locations:
+  windows: "{appdata}/obs-studio"
+  macos: "{app_support}/obs-studio"
+files:
+  - path: global.ini
+    format: ini
+  # OBS 31 and later moved user settings out of global.ini.
+  - path: user.ini
+    format: ini
+  - path: basic/profiles/
+  - path: basic/scenes/
+    translate: [absolute-paths]
+exclude:
+  # Holds the stream key.
+  - "**/service.json"
+  - "**/*.bak"
+cross_os: true

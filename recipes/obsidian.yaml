@@ -1,0 +1,14 @@
+# App settings only. Vaults (and each vault's .obsidian folder) are the user's own files.
+id: obsidian
+name: Obsidian
+locations:
+  windows: "{appdata}/obsidian"
+  macos: "{app_support}/obsidian"
+files:
+  - path: obsidian.json
+    format: json
+    translate: [absolute-paths]
+  - path: Preferences
+    format: json
+  - path: Custom Dictionary.txt
+cross_os: true
