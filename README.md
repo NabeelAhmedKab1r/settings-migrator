@@ -4,7 +4,23 @@
 
 An open-source desktop app and command-line tool that moves your app settings to a new computer, including between Windows and Mac. Settings are captured into one portable bundle file, previewed before anything is written, and restored with an undo backup. Secrets (passwords, tokens, session cookies) are never copied.
 
-> **Status:** early development. Nothing works yet beyond the project skeleton.
+> **Status:** early development. Same-OS capture and restore work from the command line for VS Code, Git, Obsidian, VLC and OBS Studio. Moving between Windows and Mac, and the desktop app, are coming.
+
+## Using it
+
+```sh
+settings-migrator scan                              # what can be captured on this computer
+settings-migrator capture -o settings.zip --dry-run  # list the files, write nothing
+settings-migrator capture -o settings.zip            # make the bundle
+settings-migrator restore settings.zip --dry-run     # see what would change, write nothing
+settings-migrator restore settings.zip               # back up originals, then restore
+settings-migrator undo --dry-run                     # see what undo would put back
+settings-migrator undo                               # put back what the last restore changed
+```
+
+Add `--app vscode` (repeatable) to work on some apps only, and `--home DIR` to try everything against a test folder instead of your real home.
+
+Restore backs up every file it changes before writing, under `~/Library/Application Support/settings-migrator/undo` on macOS and `%LOCALAPPDATA%\settings-migrator\undo` on Windows. Known secret files (credentials, private keys, cookie and password stores) are never captured.
 
 ## Building
 

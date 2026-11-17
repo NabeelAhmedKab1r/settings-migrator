@@ -3,11 +3,16 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
+pub mod bundle;
 mod error;
 pub mod paths;
 pub mod recipe;
+pub mod restore;
 pub mod scan;
 pub mod secrets;
+pub mod undo;
 
 pub use error::{Error, Result};
 pub use paths::PathContext;
@@ -17,7 +22,8 @@ pub use recipe::{Recipe, RecipeSet};
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Operating systems the engine supports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Os {
     Windows,
     MacOs,

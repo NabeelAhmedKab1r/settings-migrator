@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use settings_migrator_engine::{
+    bundle::{self, Bundle},
+    restore::{self, Action},
     scan::{scan, ScanStatus},
+    undo::{UndoSet, UndoStep},
     Os, PathContext, RecipeSet, VERSION,
 };
 
@@ -30,6 +33,35 @@ enum Command {
         /// Only these apps (recipe ids, such as vscode).
         #[arg(long = "app", value_name = "ID")]
         apps: Vec<String>,
+    },
+    /// Save settings into a bundle file you can move to another computer.
+    Capture {
+        /// Bundle file to create (it must not exist yet).
+        #[arg(short, long, value_name = "FILE")]
+        output: PathBuf,
+        /// Only these apps (recipe ids, such as vscode).
+        #[arg(long = "app", value_name = "ID")]
+        apps: Vec<String>,
+        /// Show what would be captured without writing the bundle.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Put the settings from a bundle onto this computer, backing up originals first.
+    Restore {
+        /// Bundle file made by `capture`.
+        bundle: PathBuf,
+        /// Only these apps (recipe ids, such as vscode).
+        #[arg(long = "app", value_name = "ID")]
+        apps: Vec<String>,
+        /// Show what would change without writing anything.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Put back the files changed by the most recent restore.
+    Undo {
+        /// Show what would be put back without changing anything.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -73,8 +105,115 @@ fn run(cli: Cli) -> Result<()> {
                 }
             }
         }
+        Command::Capture {
+            output,
+            apps,
+            dry_run,
+        } => {
+            let selected = recipes.select(&apps)?;
+            if dry_run {
+                println!("Dry run: would capture into {}", output.display());
+                let mut total = 0;
+                for app in scan(&ctx, &selected)? {
+                    if let ScanStatus::Found { files, .. } = app.status {
+                        println!("  {} [{}]", app.recipe.name, app.recipe.id);
+                        for (rel, size) in files {
+                            println!("     {rel}  ({})", human_size(size));
+                            total += 1;
+                        }
+                    }
+                }
+                println!("{}. Nothing was written.", files(total));
+            } else {
+                let manifest = bundle::capture(&ctx, &selected, &output)?;
+                for app in &manifest.apps {
+                    println!("  {} [{}]: {}", app.name, app.id, files(app.files.len()));
+                }
+                let total: usize = manifest.apps.iter().map(|app| app.files.len()).sum();
+                println!("Captured {} into {}", files(total), output.display());
+            }
+        }
+        Command::Restore {
+            bundle,
+            apps,
+            dry_run,
+        } => {
+            let opened = Bundle::open(&bundle)?;
+            let plan = restore::plan(&ctx, &recipes, &opened, &apps)?;
+            if dry_run {
+                println!("Dry run: nothing will be written.");
+            }
+            let mut current_app = "";
+            for item in &plan.items {
+                if item.app_id != current_app {
+                    current_app = &item.app_id;
+                    println!("  {} [{}]", item.app_name, item.app_id);
+                }
+                let shown = item
+                    .target
+                    .as_ref()
+                    .map_or(item.rel.clone(), |target| target.display().to_string());
+                let label = match &item.action {
+                    Action::Create => "create   ".to_string(),
+                    Action::Update => "update   ".to_string(),
+                    Action::Unchanged => "unchanged".to_string(),
+                    Action::Skip(reason) => format!("skip ({reason})"),
+                };
+                println!("     {label}  {shown}");
+            }
+            let writes = plan.writes().count();
+            if dry_run {
+                println!("{} would be written.", files(writes));
+            } else {
+                let name = bundle.file_name().unwrap_or_default().to_string_lossy();
+                match restore::apply(&ctx, &plan, &name)? {
+                    Some(set) => println!(
+                        "Restored {}. Originals are backed up; run `undo` to put them back ({}).",
+                        files(writes),
+                        set.id
+                    ),
+                    None => println!("Nothing to restore; everything already matches."),
+                }
+            }
+        }
+        Command::Undo { dry_run } => {
+            let Some(mut set) = UndoSet::latest(&ctx)? else {
+                println!("Nothing to undo.");
+                return Ok(());
+            };
+            println!(
+                "{}restore of {} ({}):",
+                if dry_run {
+                    "Dry run: would undo the "
+                } else {
+                    "Undoing the "
+                },
+                set.record.bundle,
+                set.id
+            );
+            for step in set.steps() {
+                match step {
+                    UndoStep::Restore(path) => println!("     put back  {}", path.display()),
+                    UndoStep::Delete(path) => println!("     delete    {}", path.display()),
+                }
+            }
+            if dry_run {
+                println!("Nothing was changed.");
+            } else {
+                set.apply()?;
+                println!("Done.");
+            }
+        }
     }
     Ok(())
+}
+
+fn files(n: usize) -> String {
+    if n == 1 {
+        "1 file".into()
+    } else {
+        format!("{n} files")
+    }
 }
 
 fn human_size(bytes: u64) -> String {
