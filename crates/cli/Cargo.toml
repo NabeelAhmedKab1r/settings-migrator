@@ -1,0 +1,15 @@
+[package]
+name = "settings-migrator-cli"
+description = "Command-line tool for Settings Migrator."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "settings-migrator"
+path = "src/main.rs"
+
+[dependencies]
+settings-migrator-engine.workspace = true
