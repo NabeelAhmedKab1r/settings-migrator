@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use settings_migrator_engine::{
-    bundle::{self, Bundle},
+    bundle::{self, Bundle, CaptureOptions, Review},
     restore::{self, Action},
     scan::{scan, ScanStatus},
     undo::{UndoSet, UndoStep},
@@ -45,6 +45,12 @@ enum Command {
         /// Show what would be captured without writing the bundle.
         #[arg(long)]
         dry_run: bool,
+        /// Leave out a file flagged as a possible secret (such as vscode/settings.json).
+        #[arg(long, value_name = "APP/FILE")]
+        skip: Vec<String>,
+        /// Include a flagged file after checking it holds no secret.
+        #[arg(long, value_name = "APP/FILE")]
+        allow: Vec<String>,
     },
     /// Put the settings from a bundle onto this computer, backing up originals first.
     Restore {
@@ -109,28 +115,60 @@ fn run(cli: Cli) -> Result<()> {
             output,
             apps,
             dry_run,
+            skip,
+            allow,
         } => {
             let selected = recipes.select(&apps)?;
+            let plan = bundle::plan_capture(&ctx, &selected, &CaptureOptions { skip, allow })?;
             if dry_run {
                 println!("Dry run: would capture into {}", output.display());
-                let mut total = 0;
-                for app in scan(&ctx, &selected)? {
-                    if let ScanStatus::Found { files, .. } = app.status {
-                        println!("  {} [{}]", app.recipe.name, app.recipe.id);
-                        for (rel, size) in files {
-                            println!("     {rel}  ({})", human_size(size));
-                            total += 1;
-                        }
+            }
+            let mut current_app = "";
+            for file in &plan.files {
+                if file.app_id != current_app {
+                    current_app = &file.app_id;
+                    println!("  {} [{}]", file.app_name, file.app_id);
+                }
+                let note = match (file.review, file.findings.is_empty()) {
+                    (Review::Skipped, _) => "  skipped",
+                    (Review::Allowed, _) => "  flagged, allowed",
+                    (Review::None, false) => "  FLAGGED",
+                    (Review::None, true) => "",
+                };
+                println!("     {}  ({}){note}", file.rel, human_size(file.size));
+            }
+
+            let blocking: Vec<_> = plan.blocking().collect();
+            if !blocking.is_empty() {
+                println!();
+                println!("Possible secrets found. Check each one:");
+                for file in &blocking {
+                    println!("  {}", file.logical_path());
+                    for finding in &file.findings {
+                        println!(
+                            "     line {}: {}  {}",
+                            finding.line, finding.kind, finding.excerpt
+                        );
                     }
                 }
-                println!("{}. Nothing was written.", files(total));
-            } else {
-                let manifest = bundle::capture(&ctx, &selected, &output)?;
-                for app in &manifest.apps {
-                    println!("  {} [{}]: {}", app.name, app.id, files(app.files.len()));
+                println!();
+                println!("Then run capture again, adding for each file:");
+                println!("  --skip APP/FILE   to leave the file out of the bundle, or");
+                println!("  --allow APP/FILE  if you're sure it holds no secret.");
+                if !dry_run {
+                    bail!("nothing was captured");
                 }
-                let total: usize = manifest.apps.iter().map(|app| app.files.len()).sum();
-                println!("Captured {} into {}", files(total), output.display());
+            }
+
+            let included = plan.included().count();
+            if dry_run {
+                println!(
+                    "{} would be captured. Nothing was written.",
+                    files(included)
+                );
+            } else {
+                plan.write(&output)?;
+                println!("Captured {} into {}", files(included), output.display());
             }
         }
         Command::Restore {

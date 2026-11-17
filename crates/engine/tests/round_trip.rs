@@ -9,7 +9,7 @@ use std::{
 };
 
 use settings_migrator_engine::{
-    bundle::{self, Bundle},
+    bundle::{self, Bundle, CaptureOptions},
     paths::join_relative,
     restore::{self, Action},
     undo::UndoSet,
@@ -136,7 +136,13 @@ fn settings_snapshot(ctx: &PathContext, root: &Path) -> BTreeMap<PathBuf, Option
 
 fn capture_all(ctx: &PathContext, recipes: &RecipeSet, dir: &Path) -> PathBuf {
     let out = dir.join("bundle.zip");
-    bundle::capture(ctx, &recipes.select(&[]).unwrap(), &out).unwrap();
+    bundle::capture(
+        ctx,
+        &recipes.select(&[]).unwrap(),
+        &CaptureOptions::default(),
+        &out,
+    )
+    .unwrap();
     out
 }
 
@@ -261,7 +267,13 @@ fn capture_never_overwrites() {
     let work = TempDir::new().unwrap();
     let out = work.path().join("bundle.zip");
     fs::write(&out, b"keep me").unwrap();
-    assert!(bundle::capture(&ctx, &recipes.select(&[]).unwrap(), &out).is_err());
+    assert!(bundle::capture(
+        &ctx,
+        &recipes.select(&[]).unwrap(),
+        &CaptureOptions::default(),
+        &out
+    )
+    .is_err());
     assert_eq!(fs::read(&out).unwrap(), b"keep me");
 }
 
@@ -328,7 +340,13 @@ fn bundle_paths_cannot_escape() {
     for bad in ["../../evil", "/etc/evil", "a/../../evil"] {
         let path = work.path().join(format!("{}.zip", bad.len()));
         let _ = fs::remove_file(&path);
-        bundle::capture(&ctx, &recipes.select(&["git".into()]).unwrap(), &path).unwrap();
+        bundle::capture(
+            &ctx,
+            &recipes.select(&["git".into()]).unwrap(),
+            &CaptureOptions::default(),
+            &path,
+        )
+        .unwrap();
         edit_manifest(&path, |m| m["apps"][0]["files"][0]["path"] = bad.into());
         assert!(Bundle::open(&path).is_err(), "{bad}");
     }
@@ -343,6 +361,7 @@ fn restore_only_writes_files_the_recipe_lists() {
     bundle::capture(
         &source_ctx,
         &recipes.select(&["git".into()]).unwrap(),
+        &CaptureOptions::default(),
         &path,
     )
     .unwrap();

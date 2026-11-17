@@ -13,7 +13,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
-use crate::{paths::join_relative, Error, Os, PathContext, Recipe, Result, VERSION};
+use crate::{
+    paths::join_relative,
+    secrets::{self, Finding},
+    Error, Os, PathContext, Recipe, Result, VERSION,
+};
 
 pub const FORMAT_VERSION: u32 = 1;
 const MANIFEST: &str = "manifest.json";
@@ -58,59 +62,189 @@ pub struct BundleApp {
     pub files: Vec<(String, Vec<u8>)>,
 }
 
-/// Captures the settings of `recipes` found on this computer into a new
-/// bundle at `out`. Apps with no settings files are left out. Never
-/// overwrites an existing file.
-pub fn capture(ctx: &PathContext, recipes: &[&Recipe], out: &Path) -> Result<Manifest> {
-    if out.exists() {
-        return Err(Error::Other(format!(
-            "{} already exists; choose another name or delete it first",
-            out.display()
-        )));
+/// How the user resolved flagged files, by logical path such as `vscode/settings.json`.
+#[derive(Debug, Default, Clone)]
+pub struct CaptureOptions {
+    /// Leave these files out of the bundle.
+    pub skip: Vec<String>,
+    /// Include these flagged files anyway; the user checked them.
+    pub allow: Vec<String>,
+}
+
+/// Everything a capture would put in the bundle, with what the secret
+/// guard found. Nothing is written until `write`.
+#[derive(Debug)]
+pub struct CapturePlan {
+    pub source_os: Os,
+    pub files: Vec<CaptureFile>,
+}
+
+#[derive(Debug)]
+pub struct CaptureFile {
+    pub app_id: String,
+    pub app_name: String,
+    pub rel: String,
+    pub size: u64,
+    pub findings: Vec<Finding>,
+    pub review: Review,
+    bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Review {
+    /// Nothing flagged, or flagged and still waiting for a decision.
+    None,
+    /// Left out at the user's request.
+    Skipped,
+    /// Flagged, but the user said it isn't a secret.
+    Allowed,
+}
+
+impl CaptureFile {
+    /// The path used in the bundle and in `--skip`/`--allow`.
+    pub fn logical_path(&self) -> String {
+        format!("{}/{}", self.app_id, self.rel)
     }
 
-    let mut manifest = Manifest {
-        format_version: FORMAT_VERSION,
-        tool_version: VERSION.to_string(),
-        source_os: ctx.os(),
-        created: humantime::format_rfc3339_seconds(SystemTime::now()).to_string(),
-        apps: Vec::new(),
-    };
-    let mut contents = Vec::new();
+    /// Flagged and not yet skipped or allowed: blocks the capture.
+    pub fn is_blocking(&self) -> bool {
+        !self.findings.is_empty() && self.review == Review::None
+    }
+}
+
+impl CapturePlan {
+    /// Files the secret guard flagged that the user hasn't resolved.
+    pub fn blocking(&self) -> impl Iterator<Item = &CaptureFile> {
+        self.files.iter().filter(|file| file.is_blocking())
+    }
+
+    /// Files that will go into the bundle.
+    pub fn included(&self) -> impl Iterator<Item = &CaptureFile> {
+        self.files
+            .iter()
+            .filter(|file| file.review != Review::Skipped)
+    }
+
+    /// Writes the bundle to `out`. Refuses while anything flagged is
+    /// unresolved, and never overwrites an existing file.
+    pub fn write(&self, out: &Path) -> Result<Manifest> {
+        let blocking: Vec<_> = self.blocking().map(CaptureFile::logical_path).collect();
+        if !blocking.is_empty() {
+            return Err(Error::Other(format!(
+                "possible secrets in {}; skip or allow each file before capturing",
+                blocking.join(", ")
+            )));
+        }
+        if out.exists() {
+            return Err(Error::Other(format!(
+                "{} already exists; choose another name or delete it first",
+                out.display()
+            )));
+        }
+
+        let mut manifest = Manifest {
+            format_version: FORMAT_VERSION,
+            tool_version: VERSION.to_string(),
+            source_os: self.source_os,
+            created: humantime::format_rfc3339_seconds(SystemTime::now()).to_string(),
+            apps: Vec::new(),
+        };
+        let mut contents = Vec::new();
+        for file in self.included() {
+            if manifest.apps.last().map(|app| &app.id) != Some(&file.app_id) {
+                manifest.apps.push(ManifestApp {
+                    id: file.app_id.clone(),
+                    name: file.app_name.clone(),
+                    files: Vec::new(),
+                });
+            }
+            manifest.apps.last_mut().unwrap().files.push(ManifestFile {
+                path: file.rel.clone(),
+                size: file.size,
+                sha256: sha256_hex(&file.bytes),
+            });
+            contents.push((file.logical_path(), file.bytes.clone()));
+        }
+
+        // Write next to the target and rename, so a failed capture never leaves
+        // a half-written bundle behind under the real name.
+        let partial = out.with_extension("partial");
+        let result = write_zip(&partial, &manifest, &contents)
+            .and_then(|()| fs::rename(&partial, out).map_err(|e| Error::io(out, e)));
+        if result.is_err() {
+            let _ = fs::remove_file(&partial);
+        }
+        result.map(|()| manifest)
+    }
+}
+
+/// Reads the settings of `recipes` found on this computer and runs the
+/// secret guard over them. Writes nothing.
+pub fn plan_capture(
+    ctx: &PathContext,
+    recipes: &[&Recipe],
+    options: &CaptureOptions,
+) -> Result<CapturePlan> {
+    let mut files = Vec::new();
     for &recipe in recipes {
         let Some(location) = recipe.location(ctx.os()) else {
             continue;
         };
         let root = ctx.resolve(location)?;
-        let mut app = ManifestApp {
-            id: recipe.id.clone(),
-            name: recipe.name.clone(),
-            files: Vec::new(),
-        };
         for rel in recipe.collect_files(&root)? {
             let path = join_relative(&root, &rel)?;
             let bytes = fs::read(&path).map_err(|e| Error::io(&path, e))?;
-            app.files.push(ManifestFile {
-                path: rel.clone(),
+            files.push(CaptureFile {
+                app_id: recipe.id.clone(),
+                app_name: recipe.name.clone(),
                 size: bytes.len() as u64,
-                sha256: sha256_hex(&bytes),
+                findings: secrets::scan_contents(&bytes),
+                review: Review::None,
+                rel,
+                bytes,
             });
-            contents.push((format!("{}/{rel}", recipe.id), bytes));
-        }
-        if !app.files.is_empty() {
-            manifest.apps.push(app);
         }
     }
 
-    // Write next to the target and rename, so a failed capture never leaves
-    // a half-written bundle behind under the real name.
-    let partial = out.with_extension("partial");
-    let result = write_zip(&partial, &manifest, &contents)
-        .and_then(|()| fs::rename(&partial, out).map_err(|e| Error::io(out, e)));
-    if result.is_err() {
-        let _ = fs::remove_file(&partial);
+    // Every --skip and --allow must name a file, so a typo can't silently
+    // leave a secret in.
+    for (paths, review) in [
+        (&options.skip, Review::Skipped),
+        (&options.allow, Review::Allowed),
+    ] {
+        for path in paths {
+            let file = files
+                .iter_mut()
+                .find(|file| file.logical_path() == *path)
+                .ok_or_else(|| {
+                    Error::Other(format!("{path} isn't one of the files being captured"))
+                })?;
+            if file.review != Review::None {
+                return Err(Error::Other(format!(
+                    "{path} can't be both skipped and allowed"
+                )));
+            }
+            if review == Review::Allowed && file.findings.is_empty() {
+                return Err(Error::Other(format!("{path} has nothing flagged to allow")));
+            }
+            file.review = review;
+        }
     }
-    result.map(|()| manifest)
+    Ok(CapturePlan {
+        source_os: ctx.os(),
+        files,
+    })
+}
+
+/// Plans and writes a bundle in one step; fails if anything is flagged
+/// and unresolved.
+pub fn capture(
+    ctx: &PathContext,
+    recipes: &[&Recipe],
+    options: &CaptureOptions,
+    out: &Path,
+) -> Result<Manifest> {
+    plan_capture(ctx, recipes, options)?.write(out)
 }
 
 fn write_zip(path: &Path, manifest: &Manifest, contents: &[(String, Vec<u8>)]) -> Result<()> {

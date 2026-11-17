@@ -1,0 +1,24 @@
+{
+  "editor.fontFamily": "'JetBrains Mono', Menlo, monospace",
+  "editor.fontSize": 14,
+  "editor.formatOnSave": true,
+  "editor.tokenColorCustomizations": {
+    "comments": "#6A9955",
+    "textMateRules": [{ "scope": "keyword", "settings": { "fontStyle": "bold" } }]
+  },
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.iconTheme": "material-icon-theme",
+  "git.autofetch": true,
+  "git.useCredentialManager": true,
+  "github.copilot.enable": { "*": true, "markdown": false },
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.fontFamily": "MesloLGS NF",
+  "files.exclude": { "**/.DS_Store": true, "**/node_modules": true },
+  "remote.SSH.remotePlatform": { "devbox-01.example.com": "linux" },
+  "rust-analyzer.check.command": "clippy",
+  "python.defaultInterpreterPath": "/opt/homebrew/bin/python3.12",
+  "security.workspace.trust.untrustedFiles": "open",
+  "settingsSync.ignoredExtensions": ["ms-python.vscode-pylance"],
+  "window.zoomLevel": 1,
+  "[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer" }
+}

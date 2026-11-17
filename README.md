@@ -20,7 +20,7 @@ settings-migrator undo                               # put back what the last re
 
 Add `--app vscode` (repeatable) to work on some apps only, and `--home DIR` to try everything against a test folder instead of your real home.
 
-Restore backs up every file it changes before writing, under `~/Library/Application Support/settings-migrator/undo` on macOS and `%LOCALAPPDATA%\settings-migrator\undo` on Windows. Known secret files (credentials, private keys, cookie and password stores) are never captured.
+Restore backs up every file it changes before writing, under `~/Library/Application Support/settings-migrator/undo` on macOS and `%LOCALAPPDATA%\settings-migrator\undo` on Windows. Known secret files (credentials, private keys, cookie and password stores) are never captured. Every other file is scanned for tokens, passwords and random-looking strings before the bundle is written; if anything is flagged, capture stops and lists it (without printing the secret). Run it again with `--skip APP/FILE` to leave a file out, or `--allow APP/FILE` if you've checked it holds no secret.
 
 ## Building
 

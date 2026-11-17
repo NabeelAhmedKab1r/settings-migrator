@@ -66,3 +66,40 @@ fn capture_restore_undo_from_the_command_line() {
     let (ok, out) = run(new.path(), &["undo"]);
     assert!(ok && out.contains("Nothing to undo"), "{out}");
 }
+
+#[test]
+fn flagged_secrets_block_capture_until_reviewed() {
+    let home = TempDir::new().unwrap();
+    let work = TempDir::new().unwrap();
+    let bundle = work.path().join("settings.zip");
+    let bundle = bundle.to_str().unwrap();
+
+    // A fake token, built at runtime so this file never contains one.
+    let token: String = std::iter::once("ghp_".to_string())
+        .chain(std::iter::repeat("aB3dE5fG7h".to_string()).take(4))
+        .collect();
+    let settings = vscode_settings(home.path());
+    fs::create_dir_all(settings.parent().unwrap()).unwrap();
+    fs::write(
+        &settings,
+        format!("{{\"env\": {{\"GITHUB_TOKEN\": \"{token}\"}}}}"),
+    )
+    .unwrap();
+
+    let (ok, out) = run(home.path(), &["capture", "-o", bundle]);
+    assert!(!ok && out.contains("GitHub token"), "{out}");
+    assert!(
+        !out.contains(&token[4..]),
+        "the review list must not print the secret"
+    );
+    assert!(!Path::new(bundle).exists());
+
+    let (ok, out) = run(home.path(), &["capture", "-o", bundle, "--dry-run"]);
+    assert!(ok && out.contains("FLAGGED"), "{out}");
+
+    let (ok, out) = run(
+        home.path(),
+        &["capture", "-o", bundle, "--allow", "vscode/settings.json"],
+    );
+    assert!(ok && Path::new(bundle).exists(), "{out}");
+}

@@ -1,0 +1,19 @@
+[user]
+	name = Test User
+	email = test@example.com
+	signingkey = 4AA5C7D2E1F0B3C9
+[credential]
+	helper = osxkeychain
+[credential "https://dev.azure.com"]
+	useHttpPath = true
+[core]
+	editor = code --wait
+	excludesfile = ~/.config/git/ignore
+[init]
+	defaultBranch = main
+[alias]
+	lg = log --graph --pretty=format:'%C(yellow)%h%Creset %s %C(green)(%cr)%Creset'
+[url "git@github.com:"]
+	insteadOf = https://github.com/
+[commit]
+	gpgsign = true
