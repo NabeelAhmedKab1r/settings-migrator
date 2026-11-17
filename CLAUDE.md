@@ -8,6 +8,6 @@ Rust workspace: `crates/engine` (library), `crates/cli` (`settings-migrator` bin
 - **Every restore backs up originals first.** Before overwriting or creating a file, record it in an undo set, so `undo` can put things back exactly as they were.
 - **Every command that writes files has a dry-run option** that shows what would happen and writes nothing.
 - **One phase at a time.** Only build the phase you were asked for. Note follow-ups for later phases; don't build them.
-- **Keep CI green.** Before saying a change is done, run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace`. Code must work on both Windows and macOS.
+- **Keep CI green.** Before saying a change is done, run every `run:` step in `.github/workflows/ci.yml` exactly as written, not just fmt, clippy and tests. Code must work on both Windows and macOS.
 - **Never commit or push.** The user does that. Say when it's a good moment to commit and suggest a message.
 - **Tests never touch real settings.** Use fake files in a temp folder and pass a fake home directory (`PathContext::for_home`, or `--home` on the CLI).
