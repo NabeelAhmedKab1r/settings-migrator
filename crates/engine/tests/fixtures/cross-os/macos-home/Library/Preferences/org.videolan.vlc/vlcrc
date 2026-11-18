@@ -1,0 +1,8 @@
+###
+### vlc 3.0.21
+###
+
+[core]
+volume-step=12.8
+snapshot-path=/Users/sam/Desktop
+input-record-path=/Users/sam/Movies

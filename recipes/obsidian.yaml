@@ -1,4 +1,6 @@
 # App settings only. Vaults (and each vault's .obsidian folder) are the user's own files.
+# Obsidian writes these files itself and the dictionary holds a checksum,
+# so line endings are left exactly as they are.
 id: obsidian
 name: Obsidian
 locations:

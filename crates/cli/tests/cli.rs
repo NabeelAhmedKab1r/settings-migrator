@@ -76,6 +76,20 @@ fn capture_restore_undo_from_the_command_line() {
 }
 
 #[test]
+fn help_hides_the_testing_flag() {
+    let output = Command::new(env!("CARGO_BIN_EXE_settings-migrator"))
+        .arg("--help")
+        .output()
+        .unwrap();
+    let help = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && help.contains("--recipes"),
+        "{help}"
+    );
+    assert!(!help.contains("--home"), "{help}");
+}
+
+#[test]
 fn flagged_secrets_block_capture_until_reviewed() {
     let home = TempDir::new().unwrap();
     let work = TempDir::new().unwrap();

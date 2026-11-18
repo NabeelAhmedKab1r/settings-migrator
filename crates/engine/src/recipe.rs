@@ -57,9 +57,11 @@ pub struct FileEntry {
     /// A file, or a folder when it ends in `/`.
     pub path: String,
     pub format: Option<Format>,
-    /// Used by cross-OS translation in phase 4.
+    /// What to translate when the settings move to the other OS.
     #[serde(default)]
     pub translate: Vec<Translator>,
+    /// Only used on this OS; skipped when restoring on the other one.
+    pub os: Option<Os>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -77,9 +79,14 @@ pub enum Format {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Translator {
+    /// Ctrl/Cmd in VS Code-style keybinding files.
     ModifierKeys,
+    /// Paths in the home folder inside settings values.
     AbsolutePaths,
+    /// CRLF on Windows, LF on macOS. Only for files the app reads as plain
+    /// text; some apps checksum their files, so this is never automatic.
     LineEndings,
+    /// Fonts missing on the target. Parsed now; translated in a later phase.
     Fonts,
 }
 
@@ -181,17 +188,27 @@ impl Recipe {
         }
     }
 
+    /// The `files` entry that lists a relative path: the file itself, or
+    /// the deepest folder holding it.
+    pub fn entry(&self, rel_path: &str) -> Option<&FileEntry> {
+        self.files
+            .iter()
+            .filter(|entry| {
+                if entry.is_dir() {
+                    rel_path.starts_with(&entry.path)
+                } else {
+                    rel_path == entry.path
+                }
+            })
+            .max_by_key(|entry| (!entry.is_dir(), entry.path.len()))
+    }
+
     /// Whether a relative path may be captured or restored for this app:
     /// listed in `files`, not excluded, and not a known secret file.
     pub fn allows(&self, rel_path: &str) -> bool {
-        let listed = self.files.iter().any(|entry| {
-            if entry.is_dir() {
-                rel_path.starts_with(&entry.path)
-            } else {
-                rel_path == entry.path
-            }
-        });
-        listed && !self.excluded.is_match(rel_path) && !secrets::is_denied(rel_path)
+        self.entry(rel_path).is_some()
+            && !self.excluded.is_match(rel_path)
+            && !secrets::is_denied(rel_path)
     }
 
     /// The settings files that exist under `root`, as sorted `/`-separated

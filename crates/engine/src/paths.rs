@@ -70,6 +70,11 @@ impl PathContext {
         self.os
     }
 
+    /// The home folder, which paths inside settings values are moved into.
+    pub fn home(&self) -> &Path {
+        &self.vars["home"]
+    }
+
     /// Where the app keeps its own data, such as undo backups.
     pub fn state_dir(&self) -> &Path {
         &self.state_dir

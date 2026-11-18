@@ -6,10 +6,12 @@ locations:
 files:
   - path: settings.json
     format: json
+    translate: [absolute-paths, line-endings]
   - path: keybindings.json
     format: json
-    translate: [modifier-keys]
+    translate: [modifier-keys, line-endings]
   - path: snippets/
+    translate: [line-endings]
 exclude:
   - globalStorage/
   - workspaceStorage/

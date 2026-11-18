@@ -19,9 +19,10 @@ use settings_migrator_engine::{
 #[derive(Parser)]
 #[command(name = "settings-migrator", version = VERSION)]
 struct Cli {
-    /// Act as if this folder were your home folder (for trying things out
-    /// safely). Restore and undo then skip checking whether apps are open.
-    #[arg(long, global = true, value_name = "DIR")]
+    /// Act as if this folder were your home folder. For tests and trying
+    /// things out safely, so hidden from --help. Restore and undo then skip
+    /// checking whether apps are open.
+    #[arg(long, global = true, value_name = "DIR", hide = true)]
     home: Option<PathBuf>,
 
     /// Load recipes from this folder instead of the built-in ones.
@@ -197,6 +198,12 @@ fn run(cli: Cli) -> Result<()> {
             if dry_run {
                 println!("Dry run: nothing will be written.");
             }
+            if plan.is_cross_os() {
+                println!(
+                    "This bundle was made on {}. Shortcuts, paths and line endings are translated for {}.",
+                    plan.source_os, plan.target_os
+                );
+            }
             let color = use_color();
             let mut current_app = "";
             for item in &plan.items {
@@ -215,10 +222,34 @@ fn run(cli: Cli) -> Result<()> {
                     Action::Skip(reason) => format!("skip ({reason})"),
                 };
                 println!("     {label}  {shown}");
+                if matches!(item.action, Action::Create | Action::Update) {
+                    for change in &item.changes {
+                        println!("{INDENT}translated: {change}");
+                    }
+                    for flag in &item.flags {
+                        let place = match flag.line {
+                            0 => String::new(),
+                            line => format!("line {line}: "),
+                        };
+                        println!(
+                            "{INDENT}{}",
+                            paint(color, "33", &format!("! {place}{}", flag.message))
+                        );
+                    }
+                }
                 print_preview(&item.preview(), color);
             }
 
             let writes = plan.writes().count();
+            let flagged = plan.flag_count();
+            if flagged > 0 {
+                println!();
+                let what = match flagged {
+                    1 => "1 item".to_string(),
+                    n => format!("{n} items"),
+                };
+                println!("Not translated: {what} (marked !), restored unchanged. Check them after restoring.");
+            }
             let running = plan.running_apps(&recipes, &open_apps()?);
             if !running.is_empty() {
                 println!();
@@ -314,15 +345,19 @@ fn use_color() -> bool {
     io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none() && !cfg!(windows)
 }
 
+/// Indent for the details under each file in the restore preview.
+const INDENT: &str = "                ";
+
+fn paint(color: bool, code: &str, text: &str) -> String {
+    if color {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
+}
+
 fn print_preview(preview: &Preview, color: bool) {
-    const INDENT: &str = "                ";
-    let paint = |code: &str, text: &str| {
-        if color {
-            format!("\x1b[{code}m{text}\x1b[0m")
-        } else {
-            text.to_string()
-        }
-    };
+    let paint = |code: &str, text: &str| paint(color, code, text);
     match preview {
         Preview::Nothing => {}
         Preview::LineEndingsOnly => println!("{INDENT}(only line endings differ)"),

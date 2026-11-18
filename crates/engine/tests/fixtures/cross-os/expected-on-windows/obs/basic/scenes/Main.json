@@ -1,0 +1,1 @@
+{"name":"Main","sources":[{"name":"Intro","id":"ffmpeg_source","settings":{"local_file":"{home_json}\\Videos\\intro.mp4"}},{"name":"Logo","id":"image_source","settings":{"file":"/Volumes/Assets/logo.png"}}]}

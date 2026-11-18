@@ -1,0 +1,8 @@
+[user]
+	name = Sam Example
+	email = sam@example.com
+[core]
+	editor = code --wait
+	excludesfile = /Users/sam/.gitignore_global
+[include]
+	path = /opt/homebrew/etc/gitconfig

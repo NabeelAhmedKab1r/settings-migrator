@@ -1,5 +1,6 @@
 //! Settings Migrator engine: loads recipes, scans for apps, captures their
-//! settings into a portable bundle and restores them with an undo backup.
+//! settings into a portable bundle and restores them with an undo backup,
+//! translating them when the bundle was made on the other OS.
 
 use std::fmt;
 
@@ -14,6 +15,7 @@ pub mod recipe;
 pub mod restore;
 pub mod scan;
 pub mod secrets;
+pub mod translate;
 pub mod undo;
 
 pub use error::{Error, Result};

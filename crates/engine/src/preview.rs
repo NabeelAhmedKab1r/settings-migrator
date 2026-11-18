@@ -70,7 +70,7 @@ pub fn diff(old: Option<&[u8]>, new: &[u8]) -> Preview {
 }
 
 /// The bytes as text, unless they aren't UTF-8 or contain NUL bytes.
-fn as_text(bytes: &[u8]) -> Option<&str> {
+pub(crate) fn as_text(bytes: &[u8]) -> Option<&str> {
     std::str::from_utf8(bytes)
         .ok()
         .filter(|text| !text.contains('\0'))

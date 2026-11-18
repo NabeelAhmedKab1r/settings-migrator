@@ -1,5 +1,7 @@
 //! Restores a bundle: first a plan (what dry-run shows), then applying it,
 //! which backs up every original into an undo set before writing anything.
+//! A bundle made on the other OS is translated while planning, so the
+//! preview shows exactly what will be written.
 
 use std::{
     fs,
@@ -12,12 +14,17 @@ use crate::{
     paths::join_relative,
     preview::{self, Preview},
     process::ProcessList,
+    translate::{self, Flag, Translation},
     undo::{UndoEntry, UndoSet},
-    Error, PathContext, RecipeSet, Result,
+    Error, Os, PathContext, RecipeSet, Result,
 };
 
 #[derive(Debug)]
 pub struct RestorePlan {
+    /// The OS the bundle was made on.
+    pub source_os: Os,
+    /// The OS it's being restored on.
+    pub target_os: Os,
     pub items: Vec<PlannedFile>,
 }
 
@@ -31,6 +38,11 @@ pub struct PlannedFile {
     /// before a target could be worked out.
     pub target: Option<PathBuf>,
     pub action: Action,
+    /// What translating for this OS changed, such as "3 shortcuts: Ctrl → Cmd".
+    pub changes: Vec<String>,
+    /// What couldn't be translated and is restored as it was.
+    pub flags: Vec<Flag>,
+    /// What will be written: the bundle's file, translated if needed.
     contents: Vec<u8>,
     /// The file as it is now, for the preview; `None` if it doesn't exist.
     current: Option<Vec<u8>>,
@@ -60,6 +72,16 @@ impl RestorePlan {
     pub fn running_apps(&self, recipes: &RecipeSet, processes: &ProcessList) -> Vec<String> {
         processes.running_apps(recipes, self.writes().map(|item| item.app_id.as_str()))
     }
+
+    /// Whether the bundle was made on the other OS.
+    pub fn is_cross_os(&self) -> bool {
+        self.source_os != self.target_os
+    }
+
+    /// Untranslatable items in the files that would be written.
+    pub fn flag_count(&self) -> usize {
+        self.writes().map(|item| item.flags.len()).sum()
+    }
 }
 
 impl PlannedFile {
@@ -74,21 +96,16 @@ impl PlannedFile {
     }
 }
 
-/// Works out what restoring `bundle` would do, without writing anything.
-/// `apps` limits it to those recipe ids; empty means every app in the bundle.
+/// Works out what restoring `bundle` would do, translating files made on
+/// the other OS, without writing anything. `apps` limits it to those recipe
+/// ids; empty means every app in the bundle.
 pub fn plan(
     ctx: &PathContext,
     recipes: &RecipeSet,
     bundle: &Bundle,
     apps: &[String],
 ) -> Result<RestorePlan> {
-    if bundle.manifest.source_os != ctx.os() {
-        return Err(Error::Other(format!(
-            "this bundle was made on {}; restoring on {} isn't supported yet",
-            bundle.manifest.source_os,
-            ctx.os()
-        )));
-    }
+    let (from, to) = (bundle.manifest.source_os, ctx.os());
     for id in apps {
         if !bundle.apps.iter().any(|app| &app.id == id) {
             return Err(Error::Other(format!(
@@ -102,12 +119,16 @@ pub fn plan(
         if !apps.is_empty() && !apps.contains(&app.id) {
             continue;
         }
-        let root = match recipes.get(&app.id).map(|r| (r, r.location(ctx.os()))) {
+        let root = match recipes.get(&app.id).map(|r| (r, r.location(to))) {
             None => Err(format!("no recipe for {:?}", app.id)),
-            Some((_, None)) => Err(format!("the recipe doesn't support {}", ctx.os())),
+            Some((_, None)) => Err(format!("the recipe doesn't support {to}")),
+            Some((recipe, _)) if from != to && !recipe.cross_os => Err(format!(
+                "the recipe doesn't support moving settings from {from} to {to}"
+            )),
             Some((recipe, Some(location))) => Ok((recipe, ctx.resolve(location)?)),
         };
         for (rel, contents) in &app.files {
+            let mut translation = None;
             let (target, action, current) = match &root {
                 Err(reason) => (None, Action::Skip(reason.clone()), None),
                 // The recipe on this computer decides what may be written, so a
@@ -117,24 +138,49 @@ pub fn plan(
                     Action::Skip("not a settings file in this app's recipe".into()),
                     None,
                 ),
-                Ok((_, root)) => {
-                    let target = join_relative(root, rel)?;
-                    let (action, current) = action_for(&target, contents)?;
-                    (Some(target), action, current)
-                }
+                Ok((recipe, root)) => match recipe.entry(rel).and_then(|entry| entry.os) {
+                    Some(os) if os != to => {
+                        (None, Action::Skip(format!("only used on {os}")), None)
+                    }
+                    _ => {
+                        let target = join_relative(root, rel)?;
+                        let translated = translate::translate(
+                            rel,
+                            recipe.entry(rel),
+                            contents,
+                            from,
+                            to,
+                            ctx.home(),
+                        );
+                        let (action, current) = action_for(&target, &translated.contents)?;
+                        translation = Some(translated);
+                        (Some(target), action, current)
+                    }
+                },
             };
+            let Translation {
+                contents,
+                changes,
+                flags,
+            } = translation.unwrap_or_else(|| Translation::unchanged(contents));
             items.push(PlannedFile {
                 app_id: app.id.clone(),
                 app_name: app.name.clone(),
                 rel: rel.clone(),
                 target,
                 action,
-                contents: contents.clone(),
+                changes,
+                flags,
+                contents,
                 current,
             });
         }
     }
-    Ok(RestorePlan { items })
+    Ok(RestorePlan {
+        source_os: from,
+        target_os: to,
+        items,
+    })
 }
 
 /// What to do with `target`, and its current contents when it's a file.

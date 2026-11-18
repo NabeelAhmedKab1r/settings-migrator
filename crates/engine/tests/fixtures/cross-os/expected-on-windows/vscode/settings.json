@@ -1,0 +1,5 @@
+{
+    "editor.fontSize": 13,
+    "terminal.integrated.cwd": "{home_json}\\Projects",
+    "git.path": "/opt/homebrew/bin/git"
+}

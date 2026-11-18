@@ -28,3 +28,55 @@ jobs:
       - run: cargo run -p settings-migrator-cli -- --version
       # Smoke test against an empty fake home, never the runner's real settings.
       - run: cargo run -p settings-migrator-cli -- --home "${{ runner.temp }}/fake-home" scan
+
+  # Cross-OS: capture the sample settings of all 5 recipes on one OS, then
+  # restore that bundle on a runner of the other OS and check every file.
+  cross-os-capture:
+    name: Cross-OS capture (${{ matrix.source }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            source: windows
+          - os: macos-latest
+            source: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The sample home in the repo, never the runner's own settings.
+      - run: cargo run -p settings-migrator-cli -- --home crates/engine/tests/fixtures/cross-os/${{ matrix.source }}-home capture -o "${{ runner.temp }}/bundle.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-from-${{ matrix.source }}
+          path: ${{ runner.temp }}/bundle.zip
+          if-no-files-found: error
+
+  cross-os-restore:
+    name: Cross-OS restore (${{ matrix.source }} to ${{ matrix.target }})
+    needs: cross-os-capture
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            source: windows
+            target: macos
+          - os: windows-latest
+            source: macos
+            target: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundle-from-${{ matrix.source }}
+          path: ${{ runner.temp }}/bundle
+      # Restores into a fake home and compares with the expected files.
+      - run: cargo test -p settings-migrator-cli --test cross_os
+        env:
+          CROSS_OS_BUNDLE: ${{ runner.temp }}/bundle/bundle.zip

@@ -6,10 +6,13 @@ locations:
 files:
   - path: global.ini
     format: ini
+    translate: [line-endings]
   # OBS 31 and later moved user settings out of global.ini.
   - path: user.ini
     format: ini
+    translate: [line-endings]
   - path: basic/profiles/
+    translate: [absolute-paths, line-endings]
   - path: basic/scenes/
     translate: [absolute-paths]
 exclude:

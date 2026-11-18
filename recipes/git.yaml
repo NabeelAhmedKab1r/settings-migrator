@@ -6,10 +6,14 @@ locations:
 files:
   - path: .gitconfig
     format: ini
+    translate: [absolute-paths, line-endings]
   - path: .config/git/config
     format: ini
+    translate: [absolute-paths, line-endings]
   - path: .config/git/ignore
+    translate: [line-endings]
   - path: .config/git/attributes
+    translate: [line-endings]
 # .git-credentials holds tokens and is never captured (the engine denylist blocks it too).
 cross_os: true
 # No processes: git is a command-line tool that reads its config on each run.

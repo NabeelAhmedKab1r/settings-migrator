@@ -435,21 +435,6 @@ fn restore_only_writes_files_the_recipe_lists() {
     assert!(!target.path().join(".ssh").exists());
 }
 
-#[test]
-fn bundles_from_another_os_are_refused_for_now() {
-    let recipes = RecipeSet::builtin().unwrap();
-    let (_source, ctx) = source_home(&recipes);
-    let work = TempDir::new().unwrap();
-    let path = capture_all(&ctx, &recipes, work.path());
-    let other = match os() {
-        Os::Windows => "macos",
-        Os::MacOs => "windows",
-    };
-    edit_manifest(&path, |m| m["source_os"] = other.into());
-    let opened = Bundle::open(&path).unwrap();
-    assert!(restore::plan(&ctx, &recipes, &opened, &[]).is_err());
-}
-
 #[cfg(unix)]
 #[test]
 fn symlinked_settings_are_skipped() {

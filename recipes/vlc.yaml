@@ -6,9 +6,11 @@ locations:
 files:
   - path: vlcrc
     format: ini
-  # Qt interface settings; Windows only, skipped where missing.
+    translate: [absolute-paths, line-endings]
+  # Qt interface settings. The macOS app has its own interface instead.
   - path: vlc-qt-interface.ini
     format: ini
+    os: windows
 cross_os: true
 processes:
   windows: [vlc.exe]

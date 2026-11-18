@@ -1,0 +1,8 @@
+###
+### vlc 3.0.21
+###
+
+[core]
+volume-step=12.8
+snapshot-path=C:\Users\Sam\Pictures\VLC
+input-record-path=C:\Users\Sam\Videos
