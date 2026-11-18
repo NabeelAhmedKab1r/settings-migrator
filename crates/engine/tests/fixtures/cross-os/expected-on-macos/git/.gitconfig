@@ -2,6 +2,7 @@
 	name = Sam Example
 	email = sam@example.com
 [core]
+	autocrlf = true
 	editor = 'C:/Program Files/Notepad++/notepad++.exe' -multiInst -notabbar -nosession
 	excludesfile = {home}/.gitignore_global
 [init]

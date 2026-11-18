@@ -4,9 +4,16 @@
 
 An open-source desktop app and command-line tool that moves your app settings to a new computer, including between Windows and Mac. Settings are captured into one portable bundle file, previewed before anything is written, and restored with an undo backup. Secrets (passwords, tokens, session cookies) are never copied.
 
-> **Status:** early development. Capture and restore work from the command line for VS Code, Git, Obsidian, VLC and OBS Studio, on the same OS or between Windows and Mac. The desktop app is coming.
+> **Status:** early development. Capture and restore work for VS Code, Git, Obsidian, VLC and OBS Studio, on the same OS or between Windows and Mac, in the desktop app or from the command line. There are no installers yet; build it from source (below).
 
-## Using it
+## The desktop app
+
+1. On your old computer, choose **Save settings from this computer**. The app finds your apps, you pick which ones to bring, and it saves one settings file. If a file looks like it holds a password or key, it asks first; leaving the file out is the default.
+2. Copy that file to your new computer.
+3. There, choose **Put settings on this computer** and pick the file. You see every change file by file before anything is written, including what was adjusted for Windows or Mac and anything that couldn't be. Your current settings are backed up first.
+4. Changed your mind? **Undo** puts everything back as it was.
+
+## The command line
 
 ```sh
 settings-migrator scan                              # what can be captured on this computer
@@ -30,11 +37,11 @@ Restore a bundle made on the other OS the same way. Each file is translated as i
 - **Paths inside settings:** a path in your old home folder moves to the same place in your new one, such as `C:\Users\Sam\Videos` to `~/Movies`.
 - **Line endings:** CRLF on Windows, LF on Mac, for the plain-text config files where the recipe asks for it.
 
-Anything that can't be translated is marked `!` in the preview and restored unchanged, never dropped. Examples are a path outside your home folder (`D:\Vaults`, `/Volumes/Backup`), a shortcut that uses the Windows key, a shortcut the other OS keeps for itself (Cmd+Tab), and files only one OS uses.
+Anything that can't be translated is marked `!` in the preview and restored unchanged, never dropped. Examples are a path outside your home folder (`D:\Vaults`, `/Volumes/Backup`), a shortcut that uses the Windows key, a shortcut the other OS keeps for itself (Cmd+Tab), and files only one OS uses. Settings that each OS usually sets differently, such as Git's `core.autocrlf`, are marked too, so you can check them.
 
 ## Building
 
-Requires [Rust](https://rustup.rs) 1.80 or later.
+Requires [Rust](https://rustup.rs) (1.80 or later for the engine and command line, 1.90 for the desktop app) and, for the desktop app, [Node.js](https://nodejs.org) 22 or later.
 
 ```sh
 cargo build --workspace
@@ -42,7 +49,17 @@ cargo test --workspace
 cargo run -p settings-migrator-cli
 ```
 
-To try commands without touching your real settings, add `--home DIR` (hidden from `--help`, since it's for testing): the folder then stands in for your home folder, and restore and undo skip the open-app check. `crates/engine/tests/fixtures/cross-os/` has sample Windows and Mac home folders to try it on.
+The desktop app is a [Tauri](https://tauri.app) app with a React and TypeScript front end, in `app/`:
+
+```sh
+cd app
+npm ci
+npm run tauri dev                          # run it, reloading as you edit
+npm test                                   # front-end tests
+npm run tauri build                        # build installers into target/release/bundle
+```
+
+To try things without touching your real settings, give it a stand-in home folder: `--home DIR` on the command line (hidden from `--help`, since it's for testing), or `SETTINGS_MIGRATOR_HOME=DIR` for the desktop app, which then shows a test-mode banner. Restore and undo then skip the open-app check. `crates/engine/tests/fixtures/cross-os/` has sample Windows and Mac home folders to try it on.
 
 ## Layout
 
@@ -50,6 +67,7 @@ To try commands without touching your real settings, add `--home DIR` (hidden fr
 | --- | --- |
 | `crates/engine` | Library that loads recipes and captures, translates and restores settings |
 | `crates/cli` | `settings-migrator` command-line tool built on the engine |
+| `app/` | Desktop app: React screens in `app/src`, Tauri commands calling the engine in `app/src-tauri` |
 | `recipes/` | One YAML recipe per supported app |
 
 ## Licence

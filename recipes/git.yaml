@@ -7,9 +7,13 @@ files:
   - path: .gitconfig
     format: ini
     translate: [absolute-paths, line-endings]
+    os_specific: &os_specific
+      # Git for Windows installs with true; on a Mac it's input or unset.
+      core.autocrlf: "sets how Git changes line endings, which Windows and macOS usually set differently (`true` on Windows, `input` or not set on macOS); check it suits {to}"
   - path: .config/git/config
     format: ini
     translate: [absolute-paths, line-endings]
+    os_specific: *os_specific
   - path: .config/git/ignore
     translate: [line-endings]
   - path: .config/git/attributes

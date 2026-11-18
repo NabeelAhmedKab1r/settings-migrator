@@ -1,0 +1,26 @@
+[package]
+name = "settings-migrator-desktop"
+description = "Desktop app for Settings Migrator."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# Tauri 2 needs a newer Rust than the engine and CLI.
+rust-version = "1.90"
+repository.workspace = true
+
+[[bin]]
+name = "settings-migrator-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+settings-migrator-engine.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3"

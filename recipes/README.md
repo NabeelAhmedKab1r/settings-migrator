@@ -12,3 +12,14 @@ Each entry under `files` can list `translate` steps for restoring on the other O
 | `fonts` | Reserved; not translated yet |
 
 A file only one OS uses gets `os: windows` or `os: macos`, and is skipped on the other. Set `cross_os: false` for an app whose settings can't move between OSes at all.
+
+A setting that Windows and macOS usually set differently goes under `os_specific`, as `section.key` with a note on why (`{to}` stands for the OS being restored on). Restoring on the other OS flags it in the preview, with its line, and leaves its value alone:
+
+```yaml
+  - path: .gitconfig
+    format: ini
+    os_specific:
+      core.autocrlf: "sets how Git changes line endings, ...; check it suits {to}"
+```
+
+This works for INI-style files such as Git config; section and key names match ignoring case.

@@ -1,6 +1,7 @@
 //! Recipe files: where an app keeps its settings and which of them to capture.
 
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -62,6 +63,12 @@ pub struct FileEntry {
     pub translate: Vec<Translator>,
     /// Only used on this OS; skipped when restoring on the other one.
     pub os: Option<Os>,
+    /// Settings in an INI-style file that Windows and macOS usually set
+    /// differently, as `section.key` and a note on why. Restoring on the
+    /// other OS flags each one found, since only the user can say which
+    /// value they want.
+    #[serde(default)]
+    pub os_specific: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -137,6 +144,16 @@ impl Recipe {
                     "file path {:?} must be relative, without ..",
                     entry.path
                 )));
+            }
+            for setting in entry.os_specific.keys() {
+                let ok = setting
+                    .split_once('.')
+                    .is_some_and(|(section, key)| !section.is_empty() && !key.is_empty());
+                if !ok {
+                    return Err(err(format!(
+                        "os_specific setting {setting:?} must be written section.key"
+                    )));
+                }
             }
         }
 
@@ -358,6 +375,7 @@ mod tests {
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nsurprise: 1",
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nprocesses: {macos: [Code]}",
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nprocesses: {windows: [C:/Code.exe]}",
+            "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a, os_specific: {autocrlf: x}}]",
         ];
         for yaml in bad {
             assert!(Recipe::parse("test", yaml).is_err(), "{yaml}");

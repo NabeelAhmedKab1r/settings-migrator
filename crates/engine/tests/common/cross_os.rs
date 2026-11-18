@@ -41,6 +41,12 @@ pub fn expected_flags(target: Os) -> &'static [(&'static str, &'static str, usiz
                 "git",
                 ".gitconfig",
                 5,
+                "`autocrlf = true` sets how Git changes line endings",
+            ),
+            (
+                "git",
+                ".gitconfig",
+                6,
                 "`C:/Program Files/Notepad++/notepad++.exe` is outside your home folder",
             ),
             (
@@ -79,7 +85,13 @@ pub fn expected_flags(target: Os) -> &'static [(&'static str, &'static str, usiz
             (
                 "git",
                 ".gitconfig",
-                8,
+                5,
+                "`autocrlf = input` sets how Git changes line endings",
+            ),
+            (
+                "git",
+                ".gitconfig",
+                9,
                 "`/opt/homebrew/etc/gitconfig` is outside your home folder",
             ),
             (

@@ -1,9 +1,11 @@
 //! Cross-OS translation: fixes what differs between Windows and macOS in a
 //! settings file (shortcuts, paths inside values, line endings), and flags
-//! anything it can't translate so the restore preview shows it. Nothing is
+//! anything it can't translate, or that each OS usually sets differently,
+//! so the restore preview shows it. Nothing is
 //! ever dropped: an untranslatable item is restored as it was.
 
 mod keys;
+mod os_specific;
 mod paths;
 
 use std::path::Path;
@@ -74,6 +76,9 @@ pub fn translate(
     };
 
     let json = entry.and_then(|entry| entry.format) == Some(Format::Json) || rel.ends_with(".json");
+    if let Some(entry) = entry {
+        os_specific::check(text, &entry.os_specific, to, &mut out);
+    }
     let mut text = text.to_string();
     if translators.contains(&Translator::ModifierKeys) {
         text = keys::translate(&text, from, to, &mut out);
