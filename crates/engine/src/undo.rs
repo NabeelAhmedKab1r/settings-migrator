@@ -10,7 +10,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{restore::write_file, Error, PathContext, Result};
+use crate::{process::ProcessList, restore::write_file, Error, PathContext, RecipeSet, Result};
 
 const RECORD: &str = "undo.json";
 const BACKUPS: &str = "backups";
@@ -161,11 +161,24 @@ impl UndoSet {
             .collect()
     }
 
+    /// Names of the apps this undo would change that are open now.
+    pub fn running_apps(&self, recipes: &RecipeSet, processes: &ProcessList) -> Vec<String> {
+        processes.running_apps(
+            recipes,
+            self.record.entries.iter().map(|e| e.app_id.as_str()),
+        )
+    }
+
     /// Puts every file back as it was before the restore, then marks the set
-    /// as undone so it isn't applied twice.
-    pub fn apply(&mut self) -> Result<()> {
+    /// as undone so it isn't applied twice. Refuses while any app it changes
+    /// is open.
+    pub fn apply(&mut self, recipes: &RecipeSet, processes: &ProcessList) -> Result<()> {
         if self.record.undone {
             return Err(Error::Other(format!("{} was already undone", self.id)));
+        }
+        let running = self.running_apps(recipes, processes);
+        if !running.is_empty() {
+            return Err(Error::AppsOpen(running));
         }
         for entry in self.record.entries.iter().rev() {
             match &entry.backup {

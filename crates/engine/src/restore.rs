@@ -10,6 +10,8 @@ use std::{
 use crate::{
     bundle::Bundle,
     paths::join_relative,
+    preview::{self, Preview},
+    process::ProcessList,
     undo::{UndoEntry, UndoSet},
     Error, PathContext, RecipeSet, Result,
 };
@@ -30,6 +32,8 @@ pub struct PlannedFile {
     pub target: Option<PathBuf>,
     pub action: Action,
     contents: Vec<u8>,
+    /// The file as it is now, for the preview; `None` if it doesn't exist.
+    current: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +54,23 @@ impl RestorePlan {
         self.items
             .iter()
             .filter(|item| matches!(item.action, Action::Create | Action::Update))
+    }
+
+    /// Names of the apps this plan would change that are open now.
+    pub fn running_apps(&self, recipes: &RecipeSet, processes: &ProcessList) -> Vec<String> {
+        processes.running_apps(recipes, self.writes().map(|item| item.app_id.as_str()))
+    }
+}
+
+impl PlannedFile {
+    /// What writing this file would change.
+    pub fn preview(&self) -> Preview {
+        match self.action {
+            Action::Create | Action::Update => {
+                preview::diff(self.current.as_deref(), &self.contents)
+            }
+            Action::Unchanged | Action::Skip(_) => Preview::Nothing,
+        }
     }
 }
 
@@ -87,18 +108,19 @@ pub fn plan(
             Some((recipe, Some(location))) => Ok((recipe, ctx.resolve(location)?)),
         };
         for (rel, contents) in &app.files {
-            let (target, action) = match &root {
-                Err(reason) => (None, Action::Skip(reason.clone())),
+            let (target, action, current) = match &root {
+                Err(reason) => (None, Action::Skip(reason.clone()), None),
                 // The recipe on this computer decides what may be written, so a
                 // bundle can never place files the recipe doesn't list.
                 Ok((recipe, _)) if !recipe.allows(rel) => (
                     None,
                     Action::Skip("not a settings file in this app's recipe".into()),
+                    None,
                 ),
                 Ok((_, root)) => {
                     let target = join_relative(root, rel)?;
-                    let action = action_for(&target, contents)?;
-                    (Some(target), action)
+                    let (action, current) = action_for(&target, contents)?;
+                    (Some(target), action, current)
                 }
             };
             items.push(PlannedFile {
@@ -108,41 +130,55 @@ pub fn plan(
                 target,
                 action,
                 contents: contents.clone(),
+                current,
             });
         }
     }
     Ok(RestorePlan { items })
 }
 
-fn action_for(target: &Path, contents: &[u8]) -> Result<Action> {
+/// What to do with `target`, and its current contents when it's a file.
+fn action_for(target: &Path, contents: &[u8]) -> Result<(Action, Option<Vec<u8>>)> {
     let meta = match fs::symlink_metadata(target) {
         Ok(meta) => meta,
-        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(Action::Create),
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok((Action::Create, None)),
         Err(e) => return Err(Error::io(target, e)),
     };
     if meta.file_type().is_symlink() {
         // Writing would replace the link (often into a dotfiles repo) with a
         // plain file, and undo couldn't bring the link back.
-        return Ok(Action::Skip("it's a symbolic link".into()));
+        return Ok((Action::Skip("it's a symbolic link".into()), None));
     }
     if !meta.is_file() {
-        return Ok(Action::Skip("a folder is in the way".into()));
+        return Ok((Action::Skip("a folder is in the way".into()), None));
     }
     let current = fs::read(target).map_err(|e| Error::io(target, e))?;
-    Ok(if current == contents {
+    let action = if current == contents {
         Action::Unchanged
     } else {
         Action::Update
-    })
+    };
+    Ok((action, Some(current)))
 }
 
-/// Applies a plan. Every file it will touch is recorded in a new undo set,
-/// with a backup of each original, before any settings file is written.
-/// Returns `None` when there was nothing to write.
-pub fn apply(ctx: &PathContext, plan: &RestorePlan, bundle_name: &str) -> Result<Option<UndoSet>> {
+/// Applies a plan. Refuses while any app it changes is open. Every file it
+/// will touch is recorded in a new undo set, with a backup of each
+/// original, before any settings file is written. Returns `None` when there
+/// was nothing to write.
+pub fn apply(
+    ctx: &PathContext,
+    recipes: &RecipeSet,
+    plan: &RestorePlan,
+    bundle_name: &str,
+    processes: &ProcessList,
+) -> Result<Option<UndoSet>> {
     let writes: Vec<_> = plan.writes().collect();
     if writes.is_empty() {
         return Ok(None);
+    }
+    let running = plan.running_apps(recipes, processes);
+    if !running.is_empty() {
+        return Err(Error::AppsOpen(running));
     }
 
     let mut set = UndoSet::create(ctx, bundle_name)?;

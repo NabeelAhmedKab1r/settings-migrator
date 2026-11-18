@@ -12,3 +12,6 @@ files:
     format: json
   - path: Custom Dictionary.txt
 cross_os: true
+processes:
+  windows: [Obsidian.exe]
+  macos: ["Obsidian.app"]

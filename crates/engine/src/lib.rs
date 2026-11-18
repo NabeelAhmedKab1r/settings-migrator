@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 pub mod bundle;
 mod error;
 pub mod paths;
+pub mod preview;
+pub mod process;
 pub mod recipe;
 pub mod restore;
 pub mod scan;

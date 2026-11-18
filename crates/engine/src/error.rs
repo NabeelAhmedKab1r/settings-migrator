@@ -14,6 +14,8 @@ pub enum Error {
     Recipe { name: String, message: String },
     #[error("path variable {{{0}}} isn't available on {1}")]
     UnknownVariable(String, crate::Os),
+    #[error("quit {} first: an open app can overwrite its settings when it quits", .0.join(" and "))]
+    AppsOpen(Vec<String>),
     #[error("{0}")]
     Other(String),
 }

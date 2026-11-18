@@ -17,3 +17,6 @@ extensions:
   list: "code --list-extensions"
   install: "code --install-extension {id}"
 cross_os: true
+processes:
+  windows: [Code.exe]
+  macos: ["Visual Studio Code.app"]

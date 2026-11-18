@@ -11,6 +11,8 @@ use std::{
 use settings_migrator_engine::{
     bundle::{self, Bundle, CaptureOptions},
     paths::join_relative,
+    preview::{DiffLine, Preview},
+    process::ProcessList,
     restore::{self, Action},
     undo::UndoSet,
     Os, PathContext, RecipeSet,
@@ -72,6 +74,19 @@ const NEVER_CAPTURED: &[(&str, &str)] = &[
     ("obs", "basic/profiles/Main/basic.ini.bak"),
     ("obs", "logs/2026-11-17.txt"),
 ];
+
+fn no_apps_open(os: Os) -> ProcessList {
+    ProcessList::from_names(os, Vec::<String>::new())
+}
+
+/// VS Code's main program as the process list shows it on `os`.
+fn vscode_open(os: Os) -> ProcessList {
+    let name = match os {
+        Os::MacOs => "/Applications/Visual Studio Code.app/Contents/MacOS/Electron",
+        Os::Windows => "Code.exe",
+    };
+    ProcessList::from_names(os, [name])
+}
 
 fn os() -> Os {
     Os::current().expect("tests run on Windows or macOS")
@@ -210,11 +225,33 @@ fn capture_then_restore_then_undo(os: Os) {
     assert_eq!(action("obs", "global.ini"), Action::Unchanged);
     assert_eq!(action("vscode", "settings.json"), Action::Create);
     assert_eq!(plan.writes().count(), SETTINGS.len() - 1);
+
+    // Every change has a preview: a diff for text, sizes for binary files.
+    let preview = |app: &str, rel: &str| {
+        plan.items
+            .iter()
+            .find(|item| item.app_id == app && item.rel == rel)
+            .unwrap()
+            .preview()
+    };
+    let Preview::Text { lines, .. } = preview("git", ".gitconfig") else {
+        panic!("expected a text diff");
+    };
+    assert!(lines.contains(&DiffLine::Removed("\tname = Old".into())));
+    assert!(lines.contains(&DiffLine::Added("\tname = Test User".into())));
+    assert!(matches!(
+        preview("obs", "basic/scenes/thumb.bin"),
+        Preview::Binary { old: None, new: 5 }
+    ));
+    assert_eq!(preview("obs", "global.ini"), Preview::Nothing);
+
     assert_eq!(settings_snapshot(&ctx, target.path()), before);
     assert!(!ctx.state_dir().exists());
 
     // Restore: every file arrives byte for byte.
-    let set = restore::apply(&ctx, &plan, "bundle.zip").unwrap().unwrap();
+    let set = restore::apply(&ctx, &recipes, &plan, "bundle.zip", &no_apps_open(ctx.os()))
+        .unwrap()
+        .unwrap();
     for (app, rel, contents) in SETTINGS {
         let path = settings_path(&ctx, &recipes, app, rel);
         assert_eq!(fs::read(&path).unwrap(), *contents, "{app}/{rel}");
@@ -230,16 +267,25 @@ fn capture_then_restore_then_undo(os: Os) {
     // Restoring the same bundle again changes nothing and needs no undo set.
     let again = restore::plan(&ctx, &recipes, &opened, &[]).unwrap();
     assert_eq!(again.writes().count(), 0);
-    assert!(restore::apply(&ctx, &again, "bundle.zip")
-        .unwrap()
-        .is_none());
+    assert!(restore::apply(
+        &ctx,
+        &recipes,
+        &again,
+        "bundle.zip",
+        &no_apps_open(ctx.os())
+    )
+    .unwrap()
+    .is_none());
 
     // Undo: the settings folders are exactly as they were, created folders included.
     let mut set = UndoSet::latest(&ctx).unwrap().unwrap();
-    set.apply().unwrap();
+    set.apply(&recipes, &no_apps_open(os)).unwrap();
     assert_eq!(settings_snapshot(&ctx, target.path()), before);
     assert!(UndoSet::latest(&ctx).unwrap().is_none());
-    assert!(set.apply().is_err(), "an undo set can't be applied twice");
+    assert!(
+        set.apply(&recipes, &no_apps_open(os)).is_err(),
+        "an undo set can't be applied twice"
+    );
 }
 
 #[test]
@@ -253,7 +299,7 @@ fn restore_can_pick_apps() {
     let ctx = PathContext::for_home(os(), target.path());
     let plan = restore::plan(&ctx, &recipes, &opened, &["vlc".into()]).unwrap();
     assert!(plan.items.iter().all(|item| item.app_id == "vlc"));
-    restore::apply(&ctx, &plan, "bundle.zip").unwrap();
+    restore::apply(&ctx, &recipes, &plan, "bundle.zip", &no_apps_open(ctx.os())).unwrap();
     assert!(settings_path(&ctx, &recipes, "vlc", "vlcrc").exists());
     assert!(!settings_path(&ctx, &recipes, "git", ".gitconfig").exists());
 
@@ -385,7 +431,7 @@ fn restore_only_writes_files_the_recipe_lists() {
     let plan = restore::plan(&ctx, &recipes, &Bundle::open(&path).unwrap(), &[]).unwrap();
     let item = plan.items.iter().find(|i| i.rel == ".ssh/config").unwrap();
     assert!(matches!(item.action, Action::Skip(_)));
-    restore::apply(&ctx, &plan, "bundle.zip").unwrap();
+    restore::apply(&ctx, &recipes, &plan, "bundle.zip", &no_apps_open(ctx.os())).unwrap();
     assert!(!target.path().join(".ssh").exists());
 }
 
@@ -420,10 +466,49 @@ fn symlinked_settings_are_skipped() {
     std::os::unix::fs::symlink(&real, target.path().join(".gitconfig")).unwrap();
 
     let plan = restore::plan(&ctx, &recipes, &opened, &["git".into()]).unwrap();
-    restore::apply(&ctx, &plan, "bundle.zip").unwrap();
+    restore::apply(&ctx, &recipes, &plan, "bundle.zip", &no_apps_open(ctx.os())).unwrap();
     assert!(fs::symlink_metadata(target.path().join(".gitconfig"))
         .unwrap()
         .file_type()
         .is_symlink());
     assert_eq!(fs::read(&real).unwrap(), b"[user]\n\tname = Dotfiles\n");
+}
+
+#[test]
+fn restore_and_undo_wait_for_open_apps_to_quit() {
+    for os in [Os::MacOs, Os::Windows] {
+        let recipes = RecipeSet::builtin().unwrap();
+        let (_source, source_ctx) = source_home_for(os, &recipes);
+        let work = TempDir::new().unwrap();
+        let opened = Bundle::open(&capture_all(&source_ctx, &recipes, work.path())).unwrap();
+
+        let target = TempDir::new().unwrap();
+        let ctx = PathContext::for_home(os, target.path());
+        let plan = restore::plan(&ctx, &recipes, &opened, &[]).unwrap();
+        assert_eq!(
+            plan.running_apps(&recipes, &vscode_open(os)),
+            ["Visual Studio Code"]
+        );
+
+        // VS Code is open: nothing is written, not even an undo set.
+        let err =
+            restore::apply(&ctx, &recipes, &plan, "bundle.zip", &vscode_open(os)).unwrap_err();
+        assert!(
+            err.to_string().contains("quit Visual Studio Code first"),
+            "{err}"
+        );
+        assert_eq!(snapshot(target.path()), BTreeMap::new());
+
+        // Restoring only other apps doesn't need VS Code closed.
+        let git_only = restore::plan(&ctx, &recipes, &opened, &["git".into()]).unwrap();
+        restore::apply(&ctx, &recipes, &git_only, "bundle.zip", &vscode_open(os)).unwrap();
+
+        // Undo waits too, once the restore touched VS Code.
+        restore::apply(&ctx, &recipes, &plan, "bundle.zip", &no_apps_open(os)).unwrap();
+        let mut set = UndoSet::latest(&ctx).unwrap().unwrap();
+        assert!(set.apply(&recipes, &vscode_open(os)).is_err());
+        assert!(settings_path(&ctx, &recipes, "vscode", "settings.json").exists());
+        set.apply(&recipes, &no_apps_open(os)).unwrap();
+        assert!(!settings_path(&ctx, &recipes, "vscode", "settings.json").exists());
+    }
 }

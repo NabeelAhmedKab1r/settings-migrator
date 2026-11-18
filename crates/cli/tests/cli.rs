@@ -51,7 +51,15 @@ fn capture_restore_undo_from_the_command_line() {
     assert!(ok && out.contains("create"), "{out}");
     assert!(!target.exists());
 
+    // Without a terminal to confirm on, restore shows the preview and refuses.
     let (ok, out) = run(new.path(), &["restore", bundle]);
+    assert!(
+        !ok && out.contains("+{\"editor.fontSize\": 15}") && out.contains("--yes"),
+        "{out}"
+    );
+    assert!(!target.exists());
+
+    let (ok, out) = run(new.path(), &["restore", bundle, "--yes"]);
     assert!(ok, "{out}");
     assert_eq!(fs::read(&target).unwrap(), b"{\"editor.fontSize\": 15}");
 

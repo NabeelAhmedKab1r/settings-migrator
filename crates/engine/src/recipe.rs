@@ -26,8 +26,22 @@ pub struct Recipe {
     pub extensions: Option<Extensions>,
     #[serde(default)]
     pub cross_os: bool,
+    /// The app's programs, so restore can check the app is closed.
+    #[serde(default)]
+    pub processes: Processes,
     #[serde(skip)]
     excluded: GlobSet,
+}
+
+/// macOS app bundle names (`Visual Studio Code.app`) and Windows program
+/// names (`Code.exe`).
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Processes {
+    #[serde(default)]
+    pub windows: Vec<String>,
+    #[serde(default)]
+    pub macos: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,6 +133,21 @@ impl Recipe {
             }
         }
 
+        for name in &recipe.processes.macos {
+            if !name.ends_with(".app") || name.contains('/') {
+                return Err(err(format!(
+                    "macOS process {name:?} must be an app bundle name ending in .app"
+                )));
+            }
+        }
+        for name in &recipe.processes.windows {
+            if !name.to_ascii_lowercase().ends_with(".exe") || name.contains(['/', '\\']) {
+                return Err(err(format!(
+                    "Windows process {name:?} must be a program name ending in .exe"
+                )));
+            }
+        }
+
         let mut globs = GlobSetBuilder::new();
         for pattern in &recipe.exclude {
             // A trailing / excludes a whole folder.
@@ -141,6 +170,14 @@ impl Recipe {
         match os {
             Os::Windows => self.locations.windows.as_deref(),
             Os::MacOs => self.locations.macos.as_deref(),
+        }
+    }
+
+    /// The app's process names on `os`; empty for tools that don't stay open.
+    pub fn processes(&self, os: Os) -> &[String] {
+        match os {
+            Os::Windows => &self.processes.windows,
+            Os::MacOs => &self.processes.macos,
         }
     }
 
@@ -302,6 +339,8 @@ mod tests {
             "id: x\nname: x\nlocations: {}\nfiles: [{path: a}]",
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: ../a}]",
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nsurprise: 1",
+            "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nprocesses: {macos: [Code]}",
+            "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nprocesses: {windows: [C:/Code.exe]}",
         ];
         for yaml in bad {
             assert!(Recipe::parse("test", yaml).is_err(), "{yaml}");

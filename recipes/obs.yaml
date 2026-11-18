@@ -17,3 +17,6 @@ exclude:
   - "**/service.json"
   - "**/*.bak"
 cross_os: true
+processes:
+  windows: [obs64.exe]
+  macos: ["OBS.app"]

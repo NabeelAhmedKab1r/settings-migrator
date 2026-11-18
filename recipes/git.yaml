@@ -12,3 +12,4 @@ files:
   - path: .config/git/attributes
 # .git-credentials holds tokens and is never captured (the engine denylist blocks it too).
 cross_os: true
+# No processes: git is a command-line tool that reads its config on each run.

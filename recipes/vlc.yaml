@@ -10,3 +10,6 @@ files:
   - path: vlc-qt-interface.ini
     format: ini
 cross_os: true
+processes:
+  windows: [vlc.exe]
+  macos: ["VLC.app"]

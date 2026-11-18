@@ -53,8 +53,8 @@ pub struct Finding {
     pub excerpt: String,
 }
 
-/// Patterns for well-known token formats. The first capture group, if any,
-/// is the secret; otherwise the whole match is.
+/// Patterns for well-known token formats. The first capture group that
+/// matched, if any, is the secret; otherwise the whole match is.
 const PATTERNS: &[(&str, &str)] = &[
     (
         "private key",
@@ -84,9 +84,12 @@ const PATTERNS: &[(&str, &str)] = &[
         "authorization header",
         r"(?i)authorization:\s*(?:basic|bearer|token)\s+([A-Za-z0-9+/=._-]{8,})",
     ),
+    // Any non-empty value under a key whose name ends in a secret word,
+    // quoted (group 1 or 2) or bare (group 3). Known-safe values are
+    // filtered out by `is_known_safe_value`.
     (
         "secret setting",
-        r"(?i)[\w.-]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)s?[\w.-]*[\x22']?[ \t]*[:=][ \t]*[\x22']?([^\s\x22'{}\[\],;$<%][^\s\x22'{}\[\],;]{7,})",
+        r"(?i)[\w.-]*?(?:password|passwd|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)s?[\x22']?[ \t]*[:=][ \t]*(?:\x22([^\x22\n]*)\x22|'([^'\n]*)'|([^\s\x22',;{}\[\]#][^\s,;}\]]*))",
     ),
 ];
 
@@ -125,8 +128,15 @@ pub fn scan_contents(bytes: &[u8]) -> Vec<Finding> {
 
     for (kind, regex) in patterns() {
         for caps in regex.captures_iter(&text) {
-            let m = caps.get(1).unwrap_or_else(|| caps.get(0).unwrap());
-            if *kind == "secret setting" && !looks_like_secret_value(m.as_str()) {
+            let m = caps
+                .iter()
+                .skip(1)
+                .flatten()
+                .next()
+                .unwrap_or_else(|| caps.get(0).unwrap());
+            if *kind == "secret setting"
+                && (m.as_str().is_empty() || is_known_safe_value(m.as_str()))
+            {
                 continue;
             }
             add(m.start(), m.end(), kind);
@@ -149,15 +159,69 @@ pub fn scan_contents(bytes: &[u8]) -> Vec<Finding> {
         .collect()
 }
 
-/// Filters "secret setting" values: plain lowercase words such as
-/// `osxkeychain` or `manager-core` name a helper, not a secret, and pure
-/// numbers are timeouts or sizes.
-fn looks_like_secret_value(value: &str) -> bool {
-    let has_letter = value.chars().any(|c| c.is_ascii_alphabetic());
-    let plain_word = value
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || matches!(c, '-' | '_' | '.'));
-    has_letter && !plain_word && !matches!(value, "true" | "false" | "null")
+/// Values that can sit under a secret-named key without being a secret.
+/// Compared without case.
+const SAFE_VALUES: &[&str] = &[
+    // Booleans and empty markers.
+    "true",
+    "false",
+    "null",
+    "none",
+    "nil",
+    "yes",
+    "no",
+    "on",
+    "off",
+    "default",
+    "auto",
+    "prompt",
+    // Git credential helpers and OS secret stores: they keep secrets
+    // elsewhere rather than being one.
+    "osxkeychain",
+    "keychain",
+    "wincred",
+    "manager",
+    "manager-core",
+    "store",
+    "cache",
+    "libsecret",
+    "gnome-libsecret",
+    "gnome-keyring",
+    "kwallet",
+    "kwallet5",
+    "kwallet6",
+    "secret-service",
+    "basic",
+    "gpg",
+];
+
+/// Whether a value under a secret-named key is known not to be a secret:
+/// a value from `SAFE_VALUES`, a reference to an environment variable
+/// (`${env:NAME}`, `${NAME}`, `$NAME`, `%NAME%`, `env:NAME`), or the path to
+/// a `git-credential-*` helper program.
+fn is_known_safe_value(value: &str) -> bool {
+    let value = value.trim();
+    let lower = value.to_ascii_lowercase();
+    let is_name = |s: &str| {
+        !s.is_empty()
+            && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && !s.starts_with(|c: char| c.is_ascii_digit())
+    };
+    let env_ref = value
+        .strip_prefix("${")
+        .and_then(|rest| rest.strip_suffix('}'))
+        .is_some_and(|inner| is_name(inner.strip_prefix("env:").unwrap_or(inner)))
+        || value.strip_prefix('$').is_some_and(is_name)
+        || value
+            .strip_prefix('%')
+            .and_then(|rest| rest.strip_suffix('%'))
+            .is_some_and(is_name)
+        || value.strip_prefix("env:").is_some_and(is_name);
+    let helper_program = lower
+        .rsplit(['/', '\\'])
+        .next()
+        .is_some_and(|name| name.starts_with("git-credential-"));
+    SAFE_VALUES.contains(&lower.as_str()) || env_ref || helper_program
 }
 
 fn is_high_entropy(candidate: &str) -> bool {
@@ -262,6 +326,14 @@ mod tests {
             kinds("[http]\n\tpassword = Hunter2Pass\n"),
             ["secret setting"]
         );
+        // Plain words and short numbers are still secrets under a secret-named key.
+        assert_eq!(kinds("password = hunter\n"), ["secret setting"]);
+        assert_eq!(kinds(r#"{"pin_password": "1234"}"#), ["secret setting"]);
+        assert_eq!(
+            kinds(r#"{"client_secret": "correct horse battery"}"#),
+            ["secret setting"]
+        );
+        assert_eq!(kinds("passphrase: 'open sesame'"), ["secret setting"]);
         assert_eq!(
             kinds(r#"{"env": {"MY_API_KEY": "abc123XYZ789"}}"#),
             ["secret setting"]
@@ -317,5 +389,33 @@ volume-step=12.8
 key-toggle-fullscreen=f
 "##;
         assert_eq!(scan_contents(ordinary.as_bytes()), []);
+    }
+
+    #[test]
+    fn known_safe_values_under_secret_keys_are_not_flagged() {
+        let safe = [
+            "password = true",
+            "token: null",
+            r#"{"apiToken": ""}"#,
+            "credential = osxkeychain",
+            "credential = manager-core",
+            r#"{"git.credential": "Manager"}"#,
+            "credential = /usr/local/share/gcm-core/git-credential-manager",
+            r"credential = C:\Git\mingw64\bin\git-credential-manager.exe",
+            r#"{"GITHUB_TOKEN": "${env:GITHUB_TOKEN}"}"#,
+            r#"{"NPM_TOKEN": "${NPM_TOKEN}"}"#,
+            "OPENAI_API_KEY=$OPENAI_API_KEY",
+            "api_key = %API_KEY%",
+            "secret: env:MY_SECRET",
+            // Keys that only contain a secret word, rather than ending in one.
+            r#"{"sessionTokenTimeout": 30000000}"#,
+            r#"{"password-store": "kwallet6", "passwordStore": "anything"}"#,
+            r#"{"tokenHighlighting": "enabled"}"#,
+        ];
+        for text in safe {
+            assert_eq!(kinds(text), Vec::<&str>::new(), "{text}");
+        }
+        // An environment reference must be just the reference.
+        assert_eq!(kinds(r#"{"token": "${env:X} extra"}"#), ["secret setting"]);
     }
 }
