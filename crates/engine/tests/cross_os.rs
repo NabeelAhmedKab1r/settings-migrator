@@ -18,15 +18,25 @@ use tempfile::TempDir;
 
 #[test]
 fn windows_to_macos() {
-    move_settings(Os::Windows, Os::MacOs);
+    move_settings(Os::Windows, Os::MacOs, "");
 }
 
 #[test]
 fn macos_to_windows() {
-    move_settings(Os::MacOs, Os::Windows);
+    move_settings(Os::MacOs, Os::Windows, "");
 }
 
-fn move_settings(from: Os, to: Os) {
+/// On a Windows runner the stand-in Mac home is a Windows temp folder, with
+/// backslashes in its path. This gives it backslashes on every OS, so a
+/// mistake that only shows on Windows shows everywhere.
+#[test]
+fn windows_to_macos_with_backslashes_in_the_home_path() {
+    move_settings(Os::Windows, Os::MacOs, r"Users\Sam");
+}
+
+/// Moves the sample settings from `from` to a fake home for `to`: a temp
+/// folder, or the folder `home` inside it.
+fn move_settings(from: Os, to: Os, home: &str) {
     let recipes = RecipeSet::builtin().unwrap();
     let source = PathContext::for_home(from, source_home(from));
     let work = TempDir::new().unwrap();
@@ -48,7 +58,11 @@ fn move_settings(from: Os, to: Os) {
     );
 
     let target = TempDir::new().unwrap();
-    let ctx = PathContext::for_home(to, target.path());
+    let home = match home {
+        "" => target.path().to_path_buf(),
+        name => target.path().join(name),
+    };
+    let ctx = PathContext::for_home(to, home);
     let plan = restore::plan(&ctx, &recipes, &opened, &[]).unwrap();
     assert!(plan.is_cross_os());
 

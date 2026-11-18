@@ -163,7 +163,7 @@ fn files_under(dir: &Path) -> Vec<String> {
 
 /// Checks that each app's settings on `ctx` are exactly the expected files
 /// for its OS: the same files, byte for byte, with `{home}` and
-/// `{home_json}` standing for the home folder.
+/// `{home_json}` standing for the home folder as the engine writes it.
 pub fn check_restored(ctx: &PathContext, recipes: &RecipeSet) {
     let mut home = ctx.home().to_string_lossy().into_owned();
     if ctx.os() == Os::Windows {
@@ -172,7 +172,13 @@ pub fn check_restored(ctx: &PathContext, recipes: &RecipeSet) {
     }
     let home_json = serde_json::to_string(&home).unwrap();
     let home_json = &home_json[1..home_json.len() - 1];
-    let home = home.replace('\\', "/");
+    // Outside JSON, Windows paths are written with / (Git config and INI
+    // files treat \ as an escape). A macOS home is written as it is, which
+    // matters when the Mac layout is tried out on Windows, where the temp
+    // folder standing in for it has backslashes.
+    if ctx.os() == Os::Windows {
+        home = home.replace('\\', "/");
+    }
     let expected_dir = fixtures().join(match ctx.os() {
         Os::Windows => "expected-on-windows",
         Os::MacOs => "expected-on-macos",
