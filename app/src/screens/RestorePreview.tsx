@@ -3,10 +3,10 @@
 // restore. Originals are backed up first, so it can be undone.
 
 import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import type { Go } from "../App";
 import {
   errorText,
+  pickBundle,
   previewRestore,
   restore,
   type RestoreFile,
@@ -44,13 +44,8 @@ export default function RestorePreview(props: { go: Go }) {
 
   const pick = async () => {
     setError(null);
-    const path = await open({
-      title: "Choose your settings file",
-      multiple: false,
-      directory: false,
-      filters: [{ name: "Settings file", extensions: ["zip"] }],
-    });
-    if (typeof path === "string") await load(path);
+    const path = await pickBundle();
+    if (path) await load(path);
   };
 
   const onRestore = async () => {
@@ -140,6 +135,7 @@ export default function RestorePreview(props: { go: Go }) {
       onBack={() => {
         setPreview(null);
         setBundle(null);
+        setError(null);
       }}
       footer={
         <>

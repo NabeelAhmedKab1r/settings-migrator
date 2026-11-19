@@ -59,6 +59,16 @@ npm test                                   # front-end tests
 npm run tauri build                        # build installers into target/release/bundle
 ```
 
+### Tests that run only in GitHub Actions
+
+`app/e2e/` holds tests that drive the app and write settings files, so they run only in CI, never on your own computer:
+
+- **Real-app tests** (`e2e/app`, Windows runner): WebdriverIO and tauri-driver drive the built app through saving, the secret review, the restore preview, restoring and undo, checking the files on disk after each step.
+- **UI tests** (`e2e/ui`, both runners): Playwright goes through every screen and error state (an app left open, a possible secret, files changed since the preview), with the engine scripted. Screenshots of every screen are uploaded as the `ui-screenshots-webkit` and `ui-screenshots-chromium` artifacts.
+- **Cross-OS app test:** the settings file the real app saves on Windows is restored with the command-line tool on macOS and checked file by file.
+
+Each refuses to start unless it's running in GitHub Actions with `SETTINGS_MIGRATOR_HOME` set to a folder inside the runner's temp folder that isn't, and doesn't hold, a real home folder (`app/e2e/guard.ts`).
+
 To try things without touching your real settings, give it a stand-in home folder: `--home DIR` on the command line (hidden from `--help`, since it's for testing), or `SETTINGS_MIGRATOR_HOME=DIR` for the desktop app, which then shows a test-mode banner. Restore and undo then skip the open-app check. `crates/engine/tests/fixtures/cross-os/` has sample Windows and Mac home folders to try it on.
 
 ## Layout

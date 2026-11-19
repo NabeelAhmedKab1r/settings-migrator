@@ -95,13 +95,28 @@ pub struct AppInfo {
     pub os: String,
     /// Set when using a stand-in home folder, so the screens can say so.
     pub test_home: Option<String>,
+    /// With a stand-in home only: where to save and which settings file to
+    /// open instead of asking with a file dialog, which the end-to-end
+    /// tests can't click through. From `SETTINGS_MIGRATOR_TEST_SAVE_AS`
+    /// and `SETTINGS_MIGRATOR_TEST_OPEN`.
+    pub test_save_as: Option<String>,
+    pub test_open: Option<String>,
 }
 
 #[tauri::command]
 pub fn app_info(state: State<'_, AppState>) -> AppInfo {
+    let test_path = |name: &str| {
+        state
+            .sandbox
+            .then(|| std::env::var(name).ok())
+            .flatten()
+            .filter(|path| !path.is_empty())
+    };
     AppInfo {
         os: state.ctx.os().to_string(),
         test_home: state.sandbox.then(|| shown(state.ctx.home())),
+        test_save_as: test_path("SETTINGS_MIGRATOR_TEST_SAVE_AS"),
+        test_open: test_path("SETTINGS_MIGRATOR_TEST_OPEN"),
     }
 }
 

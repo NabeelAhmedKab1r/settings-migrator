@@ -3,9 +3,15 @@
 // where the user chooses. Nothing is written before "Save".
 
 import { useEffect, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
 import type { Go } from "../App";
-import { errorText, planCapture, saveBundle, type CaptureFile, type ScannedApp } from "../api";
+import {
+  errorText,
+  pickSavePath,
+  planCapture,
+  saveBundle,
+  type CaptureFile,
+  type ScannedApp,
+} from "../api";
 import { Loading, Notice, Screen, Steps } from "../components";
 import { bundleName, capitalize, count } from "../format";
 import { SAVE_STEPS } from "./Scan";
@@ -41,11 +47,7 @@ export default function Capture(props: { go: Go; apps: ScannedApp[]; chosen: str
 
   const onSave = async () => {
     setError(null);
-    const path = await save({
-      title: "Save your settings file",
-      defaultPath: bundleName(),
-      filters: [{ name: "Settings file", extensions: ["zip"] }],
-    });
+    const path = await pickSavePath(bundleName());
     if (!path) return;
     setSaving(true);
     const keys = (decision: Decision) =>

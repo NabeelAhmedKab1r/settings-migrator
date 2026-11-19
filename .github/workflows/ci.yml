@@ -52,10 +52,128 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm test
+      - run: npm run typecheck:e2e
       - run: npm run build
       # A debug build without installers: checks the app compiles and links
       # on each OS with the frontend embedded, without the release wait.
       - run: npm run tauri -- build --debug --no-bundle
+
+  # UI tests of every screen and error state, with the engine scripted:
+  # WebKit on macOS (what Tauri uses there), Chromium on Windows (WebView2's
+  # engine). Screenshots of every screen are uploaded as an artifact. Like
+  # every test in app/e2e, they refuse to run outside GitHub Actions or
+  # without a stand-in home in the runner's temp folder.
+  ui-tests:
+    name: UI tests (${{ matrix.browser }} on ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            browser: chromium
+          - os: macos-latest
+            browser: webkit
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npm run test:ui
+        env:
+          SETTINGS_MIGRATOR_HOME: ${{ runner.temp }}/ui-home
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots-${{ matrix.browser }}
+          path: |
+            app/e2e/ui/screenshots
+            app/e2e/ui/report
+            app/e2e/ui/results
+          if-no-files-found: warn
+
+  # The real desktop app, driven by WebdriverIO through tauri-driver (which
+  # supports Windows but not macOS), against stand-in homes in the runner's
+  # temp folder: save, secret review, restore preview, restore and undo,
+  # checking the files on disk at each step. Also saves the Windows sample
+  # settings for the cross-OS app test below.
+  e2e-windows:
+    name: Real-app tests (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run tauri -- build --debug --no-bundle
+      - run: cargo install tauri-driver --locked
+      # tauri-driver needs the Edge WebDriver matching the WebView2 runtime.
+      - name: Get the WebView2 driver
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $version = (Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).pv
+          $dir = Join-Path $env:RUNNER_TEMP 'edgedriver'
+          try {
+            if (-not $version) { throw 'no WebView2 runtime version found' }
+            Write-Host "WebView2 runtime $version"
+            $zip = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
+            Invoke-WebRequest "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile $zip
+            Expand-Archive $zip -DestinationPath $dir -Force
+            "EDGE_DRIVER=$(Join-Path $dir 'msedgedriver.exe')" >> $env:GITHUB_ENV
+          } catch {
+            Write-Host "Using the runner's Edge driver instead: $_"
+            "EDGE_DRIVER=$(Join-Path $env:EDGEWEBDRIVER 'msedgedriver.exe')" >> $env:GITHUB_ENV
+          }
+      - run: npm run test:e2e
+        env:
+          SETTINGS_MIGRATOR_HOME: ${{ runner.temp }}/e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-app-screenshots-windows
+          path: app/e2e/app/screenshots
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-bundle-from-windows
+          path: ${{ runner.temp }}/e2e/cross-os-capture/out/bundle.zip
+          if-no-files-found: error
+
+  # Cross-OS app test: the settings file the real app saved on Windows,
+  # restored with the command-line tool on macOS into a fake home, checked
+  # file by file against the expected results (and undone).
+  cross-os-app-restore:
+    name: Cross-OS app test (app on Windows, CLI on macOS)
+    needs: e2e-windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-bundle-from-windows
+          path: ${{ runner.temp }}/app-bundle
+      - run: cargo test -p settings-migrator-cli --test cross_os
+        env:
+          CROSS_OS_BUNDLE: ${{ runner.temp }}/app-bundle/bundle.zip
 
   # Cross-OS: capture the sample settings of all 5 recipes on one OS, then
   # restore that bundle on a runner of the other OS and check every file.

@@ -2,11 +2,15 @@
 // return. Every command that writes has a preview command before it.
 
 import { invoke } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 export interface AppInfo {
   os: string;
   /** Set when trying the app out on a stand-in home folder. */
   test_home: string | null;
+  /** End-to-end tests only: paths to use instead of a file dialog. */
+  test_save_as: string | null;
+  test_open: string | null;
 }
 
 export interface ScannedApp {
@@ -111,6 +115,30 @@ export const restore = (bundle: string, apps: string[]) =>
 export const previewUndo = () => invoke<UndoPreview | null>("preview_undo");
 
 export const undo = (id: string) => invoke<void>("undo", { id });
+
+/** Asks where to save a new settings file; `null` if the user cancels. */
+export async function pickSavePath(defaultPath: string): Promise<string | null> {
+  const info = await appInfo();
+  if (info.test_save_as) return info.test_save_as;
+  return save({
+    title: "Save your settings file",
+    defaultPath,
+    filters: [{ name: "Settings file", extensions: ["zip"] }],
+  });
+}
+
+/** Asks for a settings file to restore; `null` if the user cancels. */
+export async function pickBundle(): Promise<string | null> {
+  const info = await appInfo();
+  if (info.test_open) return info.test_open;
+  const path = await open({
+    title: "Choose your settings file",
+    multiple: false,
+    directory: false,
+    filters: [{ name: "Settings file", extensions: ["zip"] }],
+  });
+  return typeof path === "string" ? path : null;
+}
 
 /** Command errors arrive as plain text. */
 export function errorText(err: unknown): string {
