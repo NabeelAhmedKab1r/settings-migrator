@@ -128,6 +128,7 @@ test.describe("capture", () => {
     await expect(button(page, "Save 12 files…")).toBeEnabled();
     await shot(page, "capture-secret-allowed");
     await button(page, "Save 12 files…").click();
+    await expect(heading(page, "Your settings are saved")).toBeVisible();
     const [saved] = await calls(page, "save_bundle");
     expect(saved).toMatchObject({ skip: [], allow: ["vscode/keybindings.json"] });
   });
@@ -148,6 +149,10 @@ test.describe("capture", () => {
     await openApp(page, script({ "plugin:dialog|save": [{ ok: null }] }));
     await toCapture(page);
     await button(page, "Save 12 files…").click();
+    // Wait until the dialog was asked for and answered, so the check below
+    // can't pass just because the click hadn't been handled yet.
+    await expect.poll(() => calls(page, "plugin:dialog|save")).toHaveLength(1);
+    await expect(button(page, "Save 12 files…")).toBeEnabled();
     await expect(heading(page, "Check and save")).toBeVisible();
     expect(await calls(page, "save_bundle")).toHaveLength(0);
   });
@@ -231,7 +236,7 @@ test.describe("restore preview", () => {
     await expect(page.getByRole("alert")).toContainText("Nothing was restored");
     await expect(page.getByRole("alert")).toContainText("Something changed since the preview");
     await expect(heading(page, "Check the changes")).toBeVisible();
-    expect(await calls(page, "preview_restore")).toHaveLength(2);
+    await expect.poll(() => calls(page, "preview_restore")).toHaveLength(2);
     await shot(page, "restore-changed-since-preview");
     await button(page, "Restore 6 files").click();
     await expect(heading(page, "Your settings are in place")).toBeVisible();
