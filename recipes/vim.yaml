@@ -1,0 +1,28 @@
+# Vim reads ~/.vimrc on macOS and ~/_vimrc (or ~/.vimrc) on Windows, with
+# plugins and colours in ~/.vim or ~/vimfiles. Files keep their names.
+# Plugin downloads and Vim's own swap, undo and backup files aren't saved.
+id: vim
+name: Vim
+locations:
+  windows: "{home}"
+  macos: "{home}"
+files:
+  - path: .vimrc
+  - path: _vimrc
+  - path: .gvimrc
+  - path: _gvimrc
+  - path: .vim/
+  - path: vimfiles/
+exclude:
+  - "*/plugged/"
+  - "*/bundle/"
+  - "*/pack/"
+  - "*/undo/"
+  - "*/swap/"
+  - "*/backup/"
+  - "*/view/"
+  - "**/.netrwhist"
+cross_os: true
+processes:
+  windows: [gvim.exe]
+  macos: ["MacVim.app"]

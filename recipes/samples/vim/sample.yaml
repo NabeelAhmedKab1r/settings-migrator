@@ -1,0 +1,5 @@
+# Sample files that must never be saved.
+not_saved:
+  - ".vim/plugged/sample/plugin/sample.vim"
+  - ".vim/undo/sample"
+  - ".viminfo"

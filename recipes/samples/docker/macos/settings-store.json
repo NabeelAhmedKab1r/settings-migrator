@@ -1,0 +1,5 @@
+{
+  "AutoStart": false,
+  "MemoryMiB": 4096,
+  "Cpus": 4
+}

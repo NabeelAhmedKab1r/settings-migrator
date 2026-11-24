@@ -24,7 +24,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      # The recipe sample tests (crates/engine/tests/recipes.rs) write fake
+      # homes only inside this folder, and refuse to run without it.
       - run: cargo test --workspace
+        env:
+          SETTINGS_MIGRATOR_HOME: ${{ runner.temp }}/recipe-tests
       - run: cargo run -p settings-migrator-cli -- --version
       # Smoke test against an empty fake home, never the runner's real settings.
       - run: cargo run -p settings-migrator-cli -- --home "${{ runner.temp }}/fake-home" scan

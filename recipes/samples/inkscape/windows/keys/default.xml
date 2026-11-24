@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<keys name="Sample">
+  <bind key="d" modifiers="Ctrl" action="app.duplicate" />
+</keys>

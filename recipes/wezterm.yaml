@@ -1,0 +1,15 @@
+# WezTerm's config is a Lua script. Its key bindings (CTRL or CMD in the
+# script) aren't translated; wezterm's SUPER key is Cmd on macOS and the
+# Windows key on Windows.
+id: wezterm
+name: WezTerm
+locations:
+  windows: "{home}"
+  macos: "{home}"
+files:
+  - path: .wezterm.lua
+  - path: .config/wezterm/
+cross_os: true
+processes:
+  windows: [wezterm-gui.exe]
+  macos: ["WezTerm.app"]

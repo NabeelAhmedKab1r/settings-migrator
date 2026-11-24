@@ -4,7 +4,21 @@
 
 An open-source desktop app and command-line tool that moves your app settings to a new computer, including between Windows and Mac. Settings are captured into one portable bundle file, previewed before anything is written, and restored with an undo backup. Secrets (passwords, tokens, session cookies) are never copied.
 
-> **Status:** early development. Capture and restore work for VS Code, Git, Obsidian, VLC and OBS Studio, on the same OS or between Windows and Mac, in the desktop app or from the command line. There are no installers yet; build it from source (below).
+> **Status:** early development. Capture and restore work for the 30 apps below, on the same OS or between Windows and Mac where the app allows it, in the desktop app or from the command line. There are no installers yet; build it from source (below).
+
+## Supported apps
+
+| Group | Apps | Between Windows and Mac |
+| --- | --- | --- |
+| Code editors | VS Code, Cursor, Sublime Text, JetBrains IDEs, Zed | Yes. VS Code and Cursor shortcuts switch Ctrl and Cmd; Sublime keeps a key file per OS; JetBrains and Zed shortcuts are copied as they are |
+| Dev tools | Git, SSH config (never keys), npm config, Docker Desktop | Yes, except Docker Desktop (same OS only) |
+| Notes | Obsidian (app settings, not vaults) | Yes |
+| Browsers | Firefox, Chrome, Edge, Brave: bookmarks only | Yes |
+| Media and creative | OBS Studio, VLC, Blender, GIMP, Inkscape, Audacity | Yes |
+| Terminals and shells | Windows Terminal (Windows), iTerm2 (Mac), WezTerm, Alacritty, PowerShell profile, zsh, bash, Starship | WezTerm, Alacritty and Starship yes; shell scripts and single-OS terminals same OS only |
+| Text editors | Vim, Neovim | Yes |
+
+Each app's recipe in [`recipes/`](recipes) says exactly which files are saved and which are left out. Browser extension lists come later. Want another app? See [CONTRIBUTING.md](CONTRIBUTING.md): a new recipe takes under an hour.
 
 ## The desktop app
 
@@ -45,9 +59,11 @@ Requires [Rust](https://rustup.rs) (1.80 or later for the engine and command lin
 
 ```sh
 cargo build --workspace
-cargo test --workspace
+SETTINGS_MIGRATOR_HOME="$TMPDIR/settings-migrator-tests" cargo test --workspace
 cargo run -p settings-migrator-cli
 ```
+
+The recipe tests (`crates/engine/tests/recipes.rs`) write fake homes only inside the folder `SETTINGS_MIGRATOR_HOME` names, which must be a new folder in your temp folder; they refuse to run without it. CI sets it to a folder in the runner's temp folder.
 
 The desktop app is a [Tauri](https://tauri.app) app with a React and TypeScript front end, in `app/`:
 
@@ -79,6 +95,8 @@ To try things without touching your real settings, give it a stand-in home folde
 | `crates/cli` | `settings-migrator` command-line tool built on the engine |
 | `app/` | Desktop app: React screens in `app/src`, Tauri commands calling the engine in `app/src-tauri` |
 | `recipes/` | One YAML recipe per supported app |
+| `recipes/samples/` | Made-up settings for each recipe, which its test saves and restores |
+| `contributing/` | Templates for a new recipe and its samples (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
 
 ## Licence
 

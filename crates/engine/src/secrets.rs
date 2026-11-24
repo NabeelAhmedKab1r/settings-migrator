@@ -84,12 +84,13 @@ const PATTERNS: &[(&str, &str)] = &[
         "authorization header",
         r"(?i)authorization:\s*(?:basic|bearer|token)\s+([A-Za-z0-9+/=._-]{8,})",
     ),
-    // Any non-empty value under a key whose name ends in a secret word,
+    // Any non-empty value under a key whose name ends in a secret word
+    // (or npm's `_auth`, which holds a base64 login),
     // quoted (group 1 or 2) or bare (group 3). Known-safe values are
     // filtered out by `is_known_safe_value`.
     (
         "secret setting",
-        r"(?i)[\w.-]*?(?:password|passwd|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)s?[\x22']?[ \t]*[:=][ \t]*(?:\x22([^\x22\n]*)\x22|'([^'\n]*)'|([^\s\x22',;{}\[\]#][^\s,;}\]]*))",
+        r"(?i)[\w.-]*?(?:password|passwd|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential|_auth)s?[\x22']?[ \t]*[:=][ \t]*(?:\x22([^\x22\n]*)\x22|'([^'\n]*)'|([^\s\x22',;{}\[\]#][^\s,;}\]]*))",
     ),
 ];
 
@@ -334,6 +335,16 @@ mod tests {
             ["secret setting"]
         );
         assert_eq!(kinds("passphrase: 'open sesame'"), ["secret setting"]);
+        // npm keeps logins in .npmrc as _auth (base64), _authToken or _password.
+        assert_eq!(
+            kinds("//registry.example.com/:_auth=dXNlcjpwYXNz\n"),
+            ["secret setting"]
+        );
+        assert_eq!(
+            kinds("//registry.example.com/:_authToken=abc123\n"),
+            ["secret setting"]
+        );
+        assert!(kinds("oauth = true\nprefix=/usr/local\n").is_empty());
         assert_eq!(
             kinds(r#"{"env": {"MY_API_KEY": "abc123XYZ789"}}"#),
             ["secret setting"]

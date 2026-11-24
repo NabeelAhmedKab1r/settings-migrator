@@ -1,0 +1,4 @@
+# Sample files that must never be saved.
+not_saved:
+  - "History/abc/entries.json"
+  - "globalStorage/state.vscdb"

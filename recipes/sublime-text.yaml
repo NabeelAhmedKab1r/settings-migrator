@@ -1,0 +1,23 @@
+# Sublime Text 4 (Sublime Text 3 used "Sublime Text 3" folders).
+# Key bindings live in one file per OS (Default (Windows).sublime-keymap,
+# Default (OSX).sublime-keymap) and Sublime loads only the right one, so
+# they're copied as they are rather than translated.
+id: sublime-text
+name: Sublime Text
+locations:
+  windows: "{appdata}/Sublime Text/Packages"
+  macos: "{app_support}/Sublime Text/Packages"
+files:
+  # Settings, key bindings, snippets, and Package Control's package list.
+  - path: User/
+    translate: [absolute-paths]
+exclude:
+  - "User/Package Control.cache/"
+  - "User/Package Control.ca-*"
+  - "User/Package Control.user-ca-bundle"
+  - "User/Package Control.last-run"
+  - "User/*.crt"
+cross_os: true
+processes:
+  windows: [sublime_text.exe]
+  macos: ["Sublime Text.app"]

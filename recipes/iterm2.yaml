@@ -1,0 +1,13 @@
+# macOS only. Quit iTerm2 before restoring: macOS caches app preferences,
+# and iTerm2 writes its own over the restored file if it's open.
+id: iterm2
+name: iTerm2
+locations:
+  macos: "{home}/Library"
+files:
+  - path: Preferences/com.googlecode.iterm2.plist
+    format: plist
+  - path: Application Support/iTerm2/DynamicProfiles/
+cross_os: false
+processes:
+  macos: ["iTerm.app"]

@@ -1,0 +1,18 @@
+id: inkscape
+name: Inkscape
+locations:
+  windows: "{appdata}/inkscape"
+  macos: "{app_support}/org.inkscape.Inkscape/config/inkscape"
+files:
+  - path: preferences.xml
+    format: xml
+    translate: [absolute-paths]
+  # Custom shortcuts, copied as they are (not translated between Ctrl and Cmd).
+  - path: keys/
+    format: xml
+  - path: palettes/
+  - path: templates/
+cross_os: true
+processes:
+  windows: [inkscape.exe]
+  macos: ["Inkscape.app"]

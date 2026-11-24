@@ -1,0 +1,14 @@
+# bash on macOS, and Git Bash on Windows. Shell scripts can't be translated
+# between OSes, so they move between computers with the same OS only. The
+# secret guard flags exported tokens.
+id: bash
+name: bash
+locations:
+  windows: "{home}"
+  macos: "{home}"
+files:
+  - path: .bashrc
+  - path: .bash_profile
+  - path: .bash_aliases
+  - path: .inputrc
+cross_os: false

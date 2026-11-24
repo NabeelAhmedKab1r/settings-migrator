@@ -16,6 +16,7 @@ use crate::{
     process::ProcessList,
     translate::{self, Flag, Translation},
     undo::{UndoEntry, UndoSet},
+    wildcard::Placement,
     Error, Os, PathContext, RecipeSet, Result,
 };
 
@@ -32,7 +33,9 @@ pub struct RestorePlan {
 pub struct PlannedFile {
     pub app_id: String,
     pub app_name: String,
-    /// Path relative to the app's settings folder.
+    /// Path relative to the app's settings folder on this computer. Differs
+    /// from the path in the bundle only when a `*` folder in the recipe has
+    /// another name here (see `changes`).
     pub rel: String,
     /// Where it goes on this computer. `None` when the item is skipped
     /// before a target could be worked out.
@@ -115,6 +118,7 @@ pub fn plan(
     }
 
     let mut items = Vec::new();
+    let mut targets = std::collections::HashSet::new();
     for app in &bundle.apps {
         if !apps.is_empty() && !apps.contains(&app.id) {
             continue;
@@ -127,35 +131,55 @@ pub fn plan(
             )),
             Some((recipe, Some(location))) => Ok((recipe, ctx.resolve(location)?)),
         };
-        for (rel, contents) in &app.files {
+        for (saved_rel, contents) in &app.files {
+            let mut rel = saved_rel.clone();
             let mut translation = None;
             let (target, action, current) = match &root {
                 Err(reason) => (None, Action::Skip(reason.clone()), None),
                 // The recipe on this computer decides what may be written, so a
                 // bundle can never place files the recipe doesn't list.
-                Ok((recipe, _)) if !recipe.allows(rel) => (
+                Ok((recipe, _)) if !recipe.allows(saved_rel) => (
                     None,
                     Action::Skip("not a settings file in this app's recipe".into()),
                     None,
                 ),
-                Ok((recipe, root)) => match recipe.entry(rel).and_then(|entry| entry.os) {
+                Ok((recipe, root)) => match recipe.entry(saved_rel).and_then(|entry| entry.os) {
                     Some(os) if os != to => {
                         (None, Action::Skip(format!("only used on {os}")), None)
                     }
-                    _ => {
-                        let target = join_relative(root, rel)?;
-                        let translated = translate::translate(
-                            rel,
-                            recipe.entry(rel),
-                            contents,
-                            from,
-                            to,
-                            ctx.home(),
-                        );
-                        let (action, current) = action_for(&target, &translated.contents)?;
-                        translation = Some(translated);
-                        (Some(target), action, current)
-                    }
+                    _ => match recipe.place(root, saved_rel)? {
+                        Placement::Skip(reason) => (None, Action::Skip(reason), None),
+                        Placement::Into {
+                            rel: placed,
+                            change,
+                            warning,
+                        } => {
+                            rel = placed;
+                            let target = join_relative(root, &rel)?;
+                            let mut translated = translate::translate(
+                                &rel,
+                                recipe.entry(saved_rel),
+                                contents,
+                                from,
+                                to,
+                                ctx.home(),
+                            );
+                            translated.changes.extend(change);
+                            if let Some(message) = warning {
+                                translated.flags.insert(0, Flag { line: 0, message });
+                            }
+                            if targets.insert(target.clone()) {
+                                let (action, current) = action_for(&target, &translated.contents)?;
+                                translation = Some(translated);
+                                (Some(target), action, current)
+                            } else {
+                                // Two saved folders matched the same one here.
+                                let reason =
+                                    "another file in this bundle goes to the same place".into();
+                                (None, Action::Skip(reason), None)
+                            }
+                        }
+                    },
                 },
             };
             let Translation {
@@ -166,7 +190,7 @@ pub fn plan(
             items.push(PlannedFile {
                 app_id: app.id.clone(),
                 app_name: app.name.clone(),
-                rel: rel.clone(),
+                rel,
                 target,
                 action,
                 changes,

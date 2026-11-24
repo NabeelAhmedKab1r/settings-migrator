@@ -1,0 +1,1 @@
+{ "main": { "prefix": "main", "body": ["fn main() {", "    $0", "}"] } }

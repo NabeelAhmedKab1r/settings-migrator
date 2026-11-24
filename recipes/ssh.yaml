@@ -1,0 +1,15 @@
+# SSH config only. Private keys, known_hosts and authorized_keys are never
+# saved, and the engine denylist blocks key files whatever a recipe says.
+# Mac-only options such as UseKeychain stop Windows OpenSSH reading the file
+# unless it has IgnoreUnknown UseKeychain; check the config after moving.
+id: ssh
+name: SSH config
+locations:
+  windows: "{home}/.ssh"
+  macos: "{home}/.ssh"
+files:
+  - path: config
+    format: text
+    translate: [absolute-paths, line-endings]
+cross_os: true
+# No processes: ssh reads its config each time it runs.

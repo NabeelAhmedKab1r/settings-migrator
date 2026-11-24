@@ -184,7 +184,18 @@ pub fn check_restored(ctx: &PathContext, recipes: &RecipeSet) {
         Os::MacOs => "expected-on-macos",
     });
 
-    for recipe in recipes.iter() {
+    // The apps with cross-OS samples here. Every other cross-OS recipe is
+    // moved between the two layouts by its own sample in tests/recipes.rs.
+    let sampled: Vec<_> = recipes
+        .iter()
+        .filter(|recipe| expected_dir.join(&recipe.id).is_dir())
+        .collect();
+    assert!(
+        sampled.len() >= 5,
+        "cross-OS samples missing from {}",
+        expected_dir.display()
+    );
+    for recipe in sampled {
         let root = ctx.resolve(recipe.location(ctx.os()).unwrap()).unwrap();
         let restored = recipe.collect_files(&root).unwrap();
         let expected = files_under(&expected_dir.join(&recipe.id));
@@ -211,7 +222,9 @@ pub fn check_restored(ctx: &PathContext, recipes: &RecipeSet) {
 /// Whether any app has settings left on `ctx`.
 pub fn any_settings(ctx: &PathContext, recipes: &RecipeSet) -> bool {
     recipes.iter().any(|recipe| {
-        let root = ctx.resolve(recipe.location(ctx.os()).unwrap()).unwrap();
-        !recipe.collect_files(&root).unwrap().is_empty()
+        recipe.location(ctx.os()).is_some_and(|location| {
+            let root = ctx.resolve(location).unwrap();
+            !recipe.collect_files(&root).unwrap().is_empty()
+        })
     })
 }

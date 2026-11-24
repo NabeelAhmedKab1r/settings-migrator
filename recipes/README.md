@@ -1,6 +1,20 @@
 # Recipes
 
-One YAML file per app, describing where it keeps its settings, which files to capture, and how to translate them between Windows and macOS.
+One YAML file per app, describing where it keeps its settings, which files to capture, and how to translate them between Windows and macOS. To add one, start from [`contributing/recipe-template.yaml`](../contributing/recipe-template.yaml) and follow [CONTRIBUTING.md](../CONTRIBUTING.md). Each recipe has made-up sample settings in `samples/<id>/`, which `crates/engine/tests/recipes.rs` saves and restores.
+
+## Folder names that differ between computers
+
+One folder name in a `files` path may use `*`, for apps that name a folder after their version (`IntelliJIdea2025.2`, Blender's `4.3`) or give it a random name (a Firefox profile):
+
+```yaml
+files:
+  - path: "*/options/"
+  - path: "Profiles/*.default-release/user.js"
+```
+
+Saving keeps each matching folder's name, but only the newest version of each product (`IntelliJIdea2025.2`, not an older `IntelliJIdea2024.3` left behind by an update). Restoring puts the files into the same folder if it exists, or else the newest version of the same product here (a warning shows if that's older than the one saved from), or else the only matching folder. If there's no matching folder, or several and none clearly right, the file is skipped and the preview says why: usually, open the app once first so it makes its folder. `*` can't be used in a file name or in more than one folder name.
+
+## Translating
 
 Each entry under `files` can list `translate` steps for restoring on the other OS:
 

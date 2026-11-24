@@ -1,0 +1,62 @@
+# IntelliJ IDEA, PyCharm, WebStorm and the other JetBrains IDEs. Each keeps
+# its settings in a folder named after the product and version, such as
+# IntelliJIdea2025.2, so the path starts with *: the newest version of each
+# IDE is saved, and restored into that IDE's folder here (open it once first).
+# Saved passwords (c.kdbx, c.pwd) sit outside these folders and are never saved.
+# Custom keymaps are copied as they are: JetBrains keymaps aren't translated
+# between Ctrl and Cmd, so pick a macOS or Windows keymap after moving.
+id: jetbrains
+name: JetBrains IDEs
+locations:
+  windows: "{appdata}/JetBrains"
+  macos: "{app_support}/JetBrains"
+files:
+  - path: "*/options/"
+    format: xml
+    translate: [absolute-paths]
+  - path: "*/keymaps/"
+    format: xml
+  - path: "*/codestyles/"
+    format: xml
+  - path: "*/colors/"
+    format: xml
+  - path: "*/templates/"
+    format: xml
+  - path: "*/fileTemplates/"
+  - path: "*/inspection/"
+    format: xml
+exclude:
+  # Machine-specific: recent projects, installed JDKs, window positions, update checks.
+  - "*/options/recentProjects.xml"
+  - "*/options/recentSolutions.xml"
+  - "*/options/jdk.table.xml"
+  - "*/options/window.state.xml"
+  - "*/options/updates.xml"
+  - "*/options/trusted-paths.xml"
+  - "*/options/*.kdbx"
+cross_os: true
+processes:
+  windows:
+    - idea64.exe
+    - pycharm64.exe
+    - webstorm64.exe
+    - goland64.exe
+    - clion64.exe
+    - rider64.exe
+    - phpstorm64.exe
+    - rubymine64.exe
+    - datagrip64.exe
+    - rustrover64.exe
+  macos:
+    - "IntelliJ IDEA.app"
+    - "IntelliJ IDEA CE.app"
+    - "PyCharm.app"
+    - "PyCharm CE.app"
+    - "WebStorm.app"
+    - "GoLand.app"
+    - "CLion.app"
+    - "Rider.app"
+    - "PhpStorm.app"
+    - "RubyMine.app"
+    - "DataGrip.app"
+    - "RustRover.app"

@@ -1,0 +1,15 @@
+# Bookmarks of the default profile only: no history, passwords, cookies or
+# sign-in. The list of extensions comes with extension support later.
+# With sync turned on, Microsoft Edge may replace these with the synced bookmarks.
+id: edge
+name: Microsoft Edge
+locations:
+  windows: "{localappdata}/Microsoft/Edge/User Data"
+  macos: "{app_support}/Microsoft Edge"
+files:
+  - path: Default/Bookmarks
+    format: json
+cross_os: true
+processes:
+  windows: [msedge.exe]
+  macos: ["Microsoft Edge.app"]

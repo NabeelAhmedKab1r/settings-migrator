@@ -1,0 +1,6 @@
+# Sample files that must never be saved.
+not_saved:
+  - "Default/History"
+  - "Default/Login Data"
+  - "Default/Preferences"
+  - "Profile 1/Bookmarks"

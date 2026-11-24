@@ -1,0 +1,17 @@
+# pluginregistry.cfg lists plugin paths on this computer, so it isn't saved;
+# Audacity finds plugins again on its first run.
+id: audacity
+name: Audacity
+locations:
+  windows: "{appdata}/audacity"
+  macos: "{app_support}/audacity"
+files:
+  - path: audacity.cfg
+    format: ini
+    translate: [absolute-paths, line-endings]
+  - path: Macros/
+    translate: [line-endings]
+cross_os: true
+processes:
+  windows: [Audacity.exe]
+  macos: ["Audacity.app"]

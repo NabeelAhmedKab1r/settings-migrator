@@ -1,0 +1,13 @@
+# Copy this folder to recipes/samples/<id>/. Put made-up settings files in
+# windows/ and macos/, laid out as they are inside the recipe's location on
+# that OS (so windows/settings.json is {appdata}/Example App/settings.json).
+# Delete the folder for an OS the recipe doesn't support.
+#
+# Add a few files the recipe must NOT save (a cache, a log, a fake secret
+# file) and list them here, so the test proves they're left out.
+not_saved:
+  - cache/data.bin
+
+# Sample files holding a fake secret that the secret guard must flag. Most
+# recipes don't need this; delete it if unused.
+flagged: []

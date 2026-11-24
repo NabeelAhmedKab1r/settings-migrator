@@ -1,0 +1,12 @@
+# Windows only. The Microsoft Store version; settings.json holds profiles,
+# colour schemes and key bindings.
+id: windows-terminal
+name: Windows Terminal
+locations:
+  windows: "{localappdata}/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
+files:
+  - path: settings.json
+    format: json
+cross_os: false
+processes:
+  windows: [WindowsTerminal.exe]

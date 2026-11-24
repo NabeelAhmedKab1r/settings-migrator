@@ -1,0 +1,15 @@
+# Bookmarks of the default profile only: no history, passwords, cookies or
+# sign-in. The list of extensions comes with extension support later.
+# With sync turned on, Brave may replace these with the synced bookmarks.
+id: brave
+name: Brave
+locations:
+  windows: "{localappdata}/BraveSoftware/Brave-Browser/User Data"
+  macos: "{app_support}/BraveSoftware/Brave-Browser"
+files:
+  - path: Default/Bookmarks
+    format: json
+cross_os: true
+processes:
+  windows: [brave.exe]
+  macos: ["Brave Browser.app"]

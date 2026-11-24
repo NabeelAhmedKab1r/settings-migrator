@@ -1,0 +1,15 @@
+# PowerShell 7 profiles. On Windows they're in Documents\PowerShell (check
+# OneDrive\Documents if Documents is backed up there); Windows PowerShell 5.1
+# profiles (Documents\WindowsPowerShell) aren't included. Profiles are
+# scripts, which can't be translated between OSes, so they move between
+# computers with the same OS only.
+id: powershell
+name: PowerShell profile
+locations:
+  windows: "{home}/Documents/PowerShell"
+  macos: "{home}/.config/powershell"
+files:
+  - path: Microsoft.PowerShell_profile.ps1
+  - path: profile.ps1
+  - path: Microsoft.VSCode_profile.ps1
+cross_os: false

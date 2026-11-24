@@ -1,0 +1,24 @@
+# GIMP 2.10 and 3.0 keep settings in a version folder, matched with *.
+# Shortcuts use <Primary>, which GIMP reads as Ctrl on Windows and Cmd on
+# macOS, so they move without translating. Moving 2.10 settings into a 3.0
+# folder works for most files; GIMP 3 renamed menurc to shortcutsrc.
+id: gimp
+name: GIMP
+locations:
+  windows: "{appdata}/GIMP"
+  macos: "{app_support}/GIMP"
+files:
+  - path: "*/gimprc"
+    translate: [absolute-paths]
+  - path: "*/menurc"
+  - path: "*/shortcutsrc"
+  - path: "*/toolrc"
+  - path: "*/templaterc"
+  - path: "*/brushes/"
+  - path: "*/palettes/"
+  - path: "*/gradients/"
+  - path: "*/patterns/"
+cross_os: true
+processes:
+  windows: [gimp-2.10.exe, gimp-3.0.exe, gimp-3.exe, gimp.exe]
+  macos: ["GIMP.app", "GIMP-2.10.app"]

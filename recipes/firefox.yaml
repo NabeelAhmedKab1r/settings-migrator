@@ -1,0 +1,23 @@
+# The default profile's bookmark backups and the user's own tweaks: no
+# history (places.sqlite), passwords, cookies or sign-in. The profile folder
+# has a random name, so the path uses * and restore puts the files into this
+# computer's profile (open Firefox once first). Firefox doesn't load bookmark
+# backups by itself: choose Bookmarks > Manage bookmarks > Import and Backup >
+# Restore after restoring.
+id: firefox
+name: Firefox
+locations:
+  windows: "{appdata}/Mozilla/Firefox"
+  macos: "{app_support}/Firefox"
+files:
+  - path: "Profiles/*.default-release/bookmarkbackups/"
+  # Preferences the user wrote themselves (prefs.js holds sign-in details too, so it isn't saved).
+  - path: "Profiles/*.default-release/user.js"
+    translate: [absolute-paths]
+  - path: "Profiles/*.default-release/chrome/"
+  - path: "Profiles/*.default-release/containers.json"
+    format: json
+cross_os: true
+processes:
+  windows: [firefox.exe]
+  macos: ["Firefox.app"]

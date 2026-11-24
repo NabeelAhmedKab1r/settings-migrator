@@ -1,0 +1,20 @@
+# Docker Desktop's own settings (resources, features, proxies). Registry
+# logins live in ~/.docker/config.json, which isn't saved. Docker Desktop
+# runs differently on each OS (WSL 2 on Windows, a VM on macOS), so its
+# settings only move between computers with the same OS.
+id: docker
+name: Docker Desktop
+locations:
+  windows: "{appdata}/Docker"
+  macos: "{home}/Library/Group Containers/group.com.docker"
+files:
+  # Docker Desktop 4.35 and later.
+  - path: settings-store.json
+    format: json
+  # Earlier versions.
+  - path: settings.json
+    format: json
+cross_os: false
+processes:
+  windows: ["Docker Desktop.exe"]
+  macos: ["Docker.app"]

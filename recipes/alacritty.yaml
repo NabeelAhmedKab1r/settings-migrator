@@ -1,0 +1,15 @@
+# Alacritty 0.13 and later (alacritty.toml; older versions used alacritty.yml).
+id: alacritty
+name: Alacritty
+locations:
+  windows: "{appdata}/alacritty"
+  macos: "{home}/.config/alacritty"
+files:
+  - path: alacritty.toml
+    format: toml
+    translate: [absolute-paths]
+  - path: themes/
+cross_os: true
+processes:
+  windows: [alacritty.exe]
+  macos: ["Alacritty.app"]

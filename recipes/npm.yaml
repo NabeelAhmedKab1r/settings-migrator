@@ -1,0 +1,13 @@
+# .npmrc can hold registry logins (_authToken, _auth, _password). The secret
+# guard flags those lines, and a flagged file is left out unless the user
+# says it's safe, so a login never moves by accident.
+id: npm
+name: npm config
+locations:
+  windows: "{home}"
+  macos: "{home}"
+files:
+  - path: .npmrc
+    format: ini
+    translate: [absolute-paths, line-endings]
+cross_os: true

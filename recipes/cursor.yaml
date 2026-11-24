@@ -1,0 +1,26 @@
+# Cursor is built on VS Code and keeps its settings the same way.
+id: cursor
+name: Cursor
+locations:
+  windows: "{appdata}/Cursor/User"
+  macos: "{app_support}/Cursor/User"
+files:
+  - path: settings.json
+    format: json
+    translate: [absolute-paths, line-endings]
+  - path: keybindings.json
+    format: json
+    translate: [modifier-keys, line-endings]
+  - path: snippets/
+    translate: [line-endings]
+exclude:
+  - globalStorage/
+  - workspaceStorage/
+  - History/
+extensions:
+  list: "cursor --list-extensions"
+  install: "cursor --install-extension {id}"
+cross_os: true
+processes:
+  windows: [Cursor.exe]
+  macos: ["Cursor.app"]

@@ -1,0 +1,9 @@
+id: starship
+name: Starship prompt
+locations:
+  windows: "{home}/.config"
+  macos: "{home}/.config"
+files:
+  - path: starship.toml
+    format: toml
+cross_os: true

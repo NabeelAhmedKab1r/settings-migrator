@@ -17,6 +17,7 @@ pub mod scan;
 pub mod secrets;
 pub mod translate;
 pub mod undo;
+pub mod wildcard;
 
 pub use error::{Error, Result};
 pub use paths::PathContext;

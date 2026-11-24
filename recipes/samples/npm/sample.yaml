@@ -1,0 +1,4 @@
+# Sample files with a fake secret, which the secret guard must flag.
+# Only the macOS sample has one; the Windows .npmrc is clean and is saved.
+flagged:
+  - "macos/.npmrc"

@@ -1,0 +1,17 @@
+# Preferences and the startup file of the newest Blender version. Version
+# folders (4.2, 4.3) are matched with *, so settings saved from 4.2 go into
+# the newest version here. Add-ons and extensions aren't saved; install them again.
+id: blender
+name: Blender
+locations:
+  windows: "{appdata}/Blender Foundation/Blender"
+  macos: "{app_support}/Blender"
+files:
+  - path: "*/config/userpref.blend"
+  - path: "*/config/startup.blend"
+  - path: "*/config/bookmarks.txt"
+    translate: [absolute-paths]
+cross_os: true
+processes:
+  windows: [blender.exe]
+  macos: ["Blender.app"]

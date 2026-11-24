@@ -1,0 +1,20 @@
+# Neovim config. Plugins are downloaded again by the plugin manager
+# (lazy-lock.json keeps their versions), so its data folder isn't saved.
+id: neovim
+name: Neovim
+locations:
+  windows: "{localappdata}/nvim"
+  macos: "{home}/.config/nvim"
+files:
+  - path: init.lua
+  - path: init.vim
+  - path: lazy-lock.json
+    format: json
+  - path: lua/
+  - path: after/
+  - path: ftplugin/
+  - path: colors/
+  - path: snippets/
+cross_os: true
+processes:
+  windows: [nvim-qt.exe]

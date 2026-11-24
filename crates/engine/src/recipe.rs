@@ -9,7 +9,12 @@ use std::{
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
-use crate::{paths::join_relative, secrets, Error, Os, Result};
+use crate::{
+    paths::join_relative,
+    secrets,
+    wildcard::{self, Placement},
+    Error, Os, Result,
+};
 
 const BUILTIN: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/builtin_recipes.rs"));
 
@@ -55,7 +60,8 @@ pub struct Locations {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileEntry {
-    /// A file, or a folder when it ends in `/`.
+    /// A file, or a folder when it ends in `/`. One folder name in it may
+    /// use `*` for names that differ between computers (see `wildcard`).
     pub path: String,
     pub format: Option<Format>,
     /// What to translate when the settings move to the other OS.
@@ -108,6 +114,32 @@ impl FileEntry {
     pub fn is_dir(&self) -> bool {
         self.path.ends_with('/')
     }
+
+    /// The path's folder and file names.
+    fn segments(&self) -> Vec<&str> {
+        self.path.trim_end_matches('/').split('/').collect()
+    }
+
+    /// Which folder name, if any, uses `*`.
+    pub fn wildcard(&self) -> Option<usize> {
+        self.segments().iter().position(|part| part.contains('*'))
+    }
+
+    /// Whether this entry lists `rel`: the file itself, or anything inside
+    /// the folder, with a `*` folder name matching any name it allows.
+    fn lists(&self, rel: &str) -> bool {
+        let pattern = self.segments();
+        let parts: Vec<&str> = rel.split('/').collect();
+        let fits = if self.is_dir() {
+            parts.len() > pattern.len()
+        } else {
+            parts.len() == pattern.len()
+        };
+        fits && pattern
+            .iter()
+            .zip(&parts)
+            .all(|(pattern, part)| wildcard::matches(pattern, part))
+    }
 }
 
 impl Recipe {
@@ -142,6 +174,15 @@ impl Recipe {
             {
                 return Err(err(format!(
                     "file path {:?} must be relative, without ..",
+                    entry.path
+                )));
+            }
+            let segments = entry.segments();
+            let starred = segments.iter().filter(|part| part.contains('*')).count();
+            let last_is_file = !entry.is_dir() && entry.wildcard() == Some(segments.len() - 1);
+            if starred > 1 || last_is_file || entry.path.contains("**") {
+                return Err(err(format!(
+                    "file path {:?} may use * in one folder name only, not in a file name",
                     entry.path
                 )));
             }
@@ -210,13 +251,7 @@ impl Recipe {
     pub fn entry(&self, rel_path: &str) -> Option<&FileEntry> {
         self.files
             .iter()
-            .filter(|entry| {
-                if entry.is_dir() {
-                    rel_path.starts_with(&entry.path)
-                } else {
-                    rel_path == entry.path
-                }
-            })
+            .filter(|entry| entry.lists(rel_path))
             .max_by_key(|entry| (!entry.is_dir(), entry.path.len()))
     }
 
@@ -234,19 +269,61 @@ impl Recipe {
     pub fn collect_files(&self, root: &Path) -> Result<Vec<String>> {
         let mut found = Vec::new();
         for entry in &self.files {
-            let path = join_relative(root, &entry.path)?;
-            if entry.is_dir() {
-                if path.is_dir() {
-                    walk(&path, entry.path.trim_end_matches('/'), &mut found)?;
+            for rel in self.expand(root, entry)? {
+                let path = join_relative(root, &rel)?;
+                if entry.is_dir() {
+                    if path.is_dir() {
+                        walk(&path, rel.trim_end_matches('/'), &mut found)?;
+                    }
+                } else if path.is_file() {
+                    found.push(rel);
                 }
-            } else if path.is_file() {
-                found.push(entry.path.clone());
             }
         }
         found.retain(|rel| self.allows(rel));
         found.sort();
         found.dedup();
         Ok(found)
+    }
+}
+
+impl Recipe {
+    /// The entry's path with its `*` folder name, if any, replaced by each
+    /// matching folder under `root` (the newest version of each product).
+    fn expand(&self, root: &Path, entry: &FileEntry) -> Result<Vec<String>> {
+        let Some(index) = entry.wildcard() else {
+            return Ok(vec![entry.path.clone()]);
+        };
+        let segments = entry.segments();
+        let parent = join_relative(root, &segments[..index].join("/"))?;
+        let names =
+            wildcard::newest_per_product(wildcard::matching_dirs(&parent, segments[index])?);
+        let trailing = if entry.is_dir() { "/" } else { "" };
+        Ok(names
+            .into_iter()
+            .map(|name| {
+                let mut parts = segments.clone();
+                parts[index] = &name;
+                format!("{}{trailing}", parts.join("/"))
+            })
+            .collect())
+    }
+
+    /// Where a file saved as `rel` goes under `root` on this computer: the
+    /// same path, unless its entry has a `*` folder whose name differs here.
+    pub fn place(&self, root: &Path, rel: &str) -> Result<Placement> {
+        let same = Placement::Into {
+            rel: rel.to_string(),
+            change: None,
+            warning: None,
+        };
+        match self
+            .entry(rel)
+            .and_then(|entry| entry.wildcard().map(|i| (entry, i)))
+        {
+            Some((entry, index)) => wildcard::place(root, &entry.segments(), index, rel),
+            None => Ok(same),
+        }
     }
 }
 
@@ -341,10 +418,12 @@ mod tests {
     #[test]
     fn builtin_recipes_load() {
         let set = RecipeSet::builtin().unwrap();
-        let ids: Vec<_> = set.iter().map(|r| r.id.as_str()).collect();
-        assert_eq!(ids, ["git", "obs", "obsidian", "vlc", "vscode"]);
+        assert_eq!(set.iter().count(), 30);
         for recipe in set.iter() {
-            assert!(recipe.location(Os::Windows).is_some() && recipe.location(Os::MacOs).is_some());
+            let both =
+                recipe.location(Os::Windows).is_some() && recipe.location(Os::MacOs).is_some();
+            // Settings can only move between OSes when the app is on both.
+            assert!(both || !recipe.cross_os, "{} is on one OS only", recipe.id);
         }
     }
 
@@ -363,6 +442,18 @@ mod tests {
 
         let git = set.get("git").unwrap();
         assert!(!git.allows(".git-credentials"));
+
+        // A * folder matches one folder name, whatever it is.
+        let jetbrains = set.get("jetbrains").unwrap();
+        assert!(jetbrains.allows("IntelliJIdea2025.2/options/editor.xml"));
+        assert!(!jetbrains.allows("IntelliJIdea2025.2/options/jdk.table.xml"));
+        assert!(!jetbrains.allows("IntelliJIdea2025.2/c.kdbx"));
+        assert!(!jetbrains.allows("a/b/options/editor.xml"));
+        let firefox = set.get("firefox").unwrap();
+        assert!(firefox.allows("Profiles/k3x9.default-release/user.js"));
+        assert!(!firefox.allows("Profiles/k3x9.default-release/prefs.js"));
+        assert!(!firefox.allows("Profiles/k3x9.default-release/logins.json"));
+        assert!(!firefox.allows("Profiles/k3x9.default/user.js"));
     }
 
     #[test]
@@ -376,6 +467,10 @@ mod tests {
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nprocesses: {macos: [Code]}",
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a}]\nprocesses: {windows: [C:/Code.exe]}",
             "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: a, os_specific: {autocrlf: x}}]",
+            // * only in one folder name, never in a file name.
+            "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: '*/*/a'}]",
+            "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: 'a/*.json'}]",
+            "id: x\nname: x\nlocations: {macos: '{home}'}\nfiles: [{path: '**/a'}]",
         ];
         for yaml in bad {
             assert!(Recipe::parse("test", yaml).is_err(), "{yaml}");

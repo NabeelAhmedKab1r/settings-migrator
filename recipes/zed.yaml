@@ -1,0 +1,21 @@
+# Zed's keymap uses its own format ("cmd-shift-p"), which the Ctrl/Cmd
+# translator doesn't read, so keymap.json is copied as it is.
+id: zed
+name: Zed
+locations:
+  windows: "{appdata}/Zed"
+  macos: "{home}/.config/zed"
+files:
+  - path: settings.json
+    format: json
+    translate: [absolute-paths]
+  - path: keymap.json
+    format: json
+  - path: tasks.json
+    format: json
+  - path: themes/
+  - path: snippets/
+cross_os: true
+processes:
+  windows: [Zed.exe]
+  macos: ["Zed.app"]

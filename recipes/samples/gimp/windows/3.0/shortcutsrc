@@ -1,0 +1,2 @@
+(file-version 1)
+(action "image-flip-horizontal" "<Primary><Shift>h")

@@ -1,0 +1,4 @@
+# Sample files that must never be saved.
+not_saved:
+  - "User/Package Control.cache/01ab"
+  - "User/Package Control.last-run"

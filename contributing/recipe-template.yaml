@@ -1,0 +1,53 @@
+# Recipe template. Copy this to recipes/<id>.yaml, fill it in, and delete
+# the comments you don't need. CONTRIBUTING.md walks through each step;
+# recipes/README.md lists every option.
+#
+# Only settings files. Anything that can hold a password, token, cookie,
+# session or licence key must not be listed (or must be under exclude).
+
+# Lower-case letters, digits and -. Also the file name: recipes/<id>.yaml.
+id: example-app
+# As people know the app.
+name: Example App
+
+# Where the app keeps its settings folder on each OS, starting with one
+# variable. Windows: {home}, {appdata} (AppData\Roaming), {localappdata}
+# (AppData\Local). macOS: {home}, {app_support} (~/Library/Application
+# Support), {preferences} (~/Library/Preferences). Leave out an OS the app
+# isn't on.
+locations:
+  windows: "{appdata}/Example App"
+  macos: "{app_support}/Example App"
+
+# Files and folders to save, relative to the location. A folder ends in /.
+# One folder name may use * when it differs between computers (a version
+# number or a random profile name): "*/config/settings.json".
+files:
+  - path: settings.json
+    # json, ini, yaml, toml, xml, plist or text. Optional.
+    format: json
+    # What to fix when moving to the other OS. Optional; see recipes/README.md.
+    #   absolute-paths  paths in the home folder move to the new home folder
+    #   line-endings    CRLF on Windows, LF on macOS (plain-text files the app doesn't checksum)
+    #   modifier-keys   Ctrl <-> Cmd in VS Code-style keybinding files only
+    translate: [absolute-paths]
+  - path: themes/
+  # A file only one OS uses:
+  # - path: windows-only.ini
+  #   os: windows
+
+# Things inside the listed folders to leave out: caches, logs, history,
+# anything machine-specific or secret. Globs; a trailing / means a folder.
+exclude:
+  - themes/cache/
+
+# true if these settings work on the other OS once translated. false if
+# they only make sense on the same OS (shell scripts, OS-specific apps).
+cross_os: true
+
+# The app's programs, so restore can wait until the app is closed.
+# Windows: the .exe name. macOS: the .app bundle name. Leave out for
+# command-line tools that don't stay open.
+processes:
+  windows: [ExampleApp.exe]
+  macos: ["Example App.app"]

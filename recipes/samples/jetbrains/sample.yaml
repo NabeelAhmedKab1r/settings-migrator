@@ -1,0 +1,5 @@
+# Sample files that must never be saved.
+not_saved:
+  - "IntelliJIdea2025.2/options/jdk.table.xml"
+  - "IntelliJIdea2024.3/options/editor.xml"
+  - "IntelliJIdea2025.2/c.kdbx"
