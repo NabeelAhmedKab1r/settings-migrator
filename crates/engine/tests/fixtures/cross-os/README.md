@@ -1,6 +1,6 @@
 # Cross-OS sample settings
 
-Fake settings for every recipe, used to test moving settings between Windows and macOS. Nothing here is real.
+Fake settings for five recipes (git, OBS, Obsidian, VLC and VS Code), used to test moving settings between Windows and macOS. Nothing here is real.
 
 | Folder | What it is |
 | --- | --- |

@@ -8,7 +8,9 @@ mod cross_os_fixtures;
 
 use std::{env, path::Path, path::PathBuf, process::Command};
 
-use cross_os_fixtures::{any_settings, check_restored, expected_flags, other, source_home};
+use cross_os_fixtures::{
+    any_settings, bundle_apps, check_restored, expected_flags, other, sampled_apps, source_home,
+};
 use settings_migrator_engine::{
     bundle::{self, Bundle, CaptureOptions},
     Os, PathContext, RecipeSet,
@@ -53,7 +55,7 @@ fn restores_a_bundle_from_the_other_os() {
         other(here),
         "the bundle must come from the other OS"
     );
-    assert_eq!(opened.apps.len(), recipes.iter().count());
+    assert_eq!(bundle_apps(&opened), sampled_apps());
     let bundle_arg = bundle_path.to_str().unwrap();
 
     // The preview says what's translated and flags what isn't, and writes nothing.

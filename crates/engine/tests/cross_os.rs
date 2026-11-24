@@ -6,7 +6,9 @@
 #[path = "common/cross_os.rs"]
 mod cross_os_fixtures;
 
-use cross_os_fixtures::{any_settings, check_restored, expected_flags, other, source_home};
+use cross_os_fixtures::{
+    any_settings, bundle_apps, check_restored, expected_flags, other, sampled_apps, source_home,
+};
 use settings_migrator_engine::{
     bundle::{self, Bundle, CaptureOptions},
     process::ProcessList,
@@ -51,11 +53,7 @@ fn move_settings(from: Os, to: Os, home: &str) {
     .unwrap();
     let opened = Bundle::open(&path).unwrap();
     assert_eq!(opened.manifest.source_os, from);
-    assert_eq!(
-        opened.apps.len(),
-        recipes.iter().count(),
-        "every recipe has samples"
-    );
+    assert_eq!(bundle_apps(&opened), sampled_apps());
 
     let target = TempDir::new().unwrap();
     let home = match home {

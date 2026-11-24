@@ -628,7 +628,7 @@ mod tests {
     fn scan_lists_every_app() {
         let (_home, state) = fake_home();
         let result = scan_apps_in(&state).unwrap();
-        assert_eq!(result.apps.len(), 5);
+        assert_eq!(result.apps.len(), state.recipes.iter().count());
         let vscode = result.apps.iter().find(|app| app.id == "vscode").unwrap();
         assert_eq!(vscode.status, "found");
         assert_eq!(vscode.files.len(), 2);

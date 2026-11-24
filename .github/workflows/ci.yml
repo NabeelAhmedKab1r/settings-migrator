@@ -26,7 +26,9 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       # The recipe sample tests (crates/engine/tests/recipes.rs) write fake
       # homes only inside this folder, and refuse to run without it.
-      - run: cargo test --workspace
+      # --no-fail-fast runs every test file even after one fails, so one log
+      # shows every failure.
+      - run: cargo test --workspace --no-fail-fast
         env:
           SETTINGS_MIGRATOR_HOME: ${{ runner.temp }}/recipe-tests
       - run: cargo run -p settings-migrator-cli -- --version

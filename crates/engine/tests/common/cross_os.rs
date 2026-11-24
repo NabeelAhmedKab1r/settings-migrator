@@ -134,6 +134,29 @@ pub fn expected_flags(target: Os) -> &'static [(&'static str, &'static str, usiz
     }
 }
 
+/// The apps with cross-OS samples here (git, OBS, Obsidian, VLC and VS
+/// Code), sorted: one folder each in the expected folders. Every other
+/// cross-OS recipe is moved between the two layouts by its own sample in
+/// tests/recipes.rs.
+pub fn sampled_apps() -> Vec<String> {
+    let mut ids: Vec<String> = fs::read_dir(fixtures().join("expected-on-macos"))
+        .unwrap()
+        .map(|entry| entry.unwrap())
+        .filter(|entry| entry.file_type().unwrap().is_dir())
+        .map(|entry| entry.file_name().into_string().unwrap())
+        .collect();
+    ids.sort();
+    assert!(ids.len() >= 5, "cross-OS samples missing");
+    ids
+}
+
+/// The ids of the apps in a bundle, sorted.
+pub fn bundle_apps(bundle: &settings_migrator_engine::bundle::Bundle) -> Vec<String> {
+    let mut ids: Vec<String> = bundle.apps.iter().map(|app| app.id.clone()).collect();
+    ids.sort();
+    ids
+}
+
 /// Every file under `dir`, as sorted `/`-separated relative paths.
 fn files_under(dir: &Path) -> Vec<String> {
     fn walk(dir: &Path, rel: &str, out: &mut Vec<String>) {
@@ -184,18 +207,8 @@ pub fn check_restored(ctx: &PathContext, recipes: &RecipeSet) {
         Os::MacOs => "expected-on-macos",
     });
 
-    // The apps with cross-OS samples here. Every other cross-OS recipe is
-    // moved between the two layouts by its own sample in tests/recipes.rs.
-    let sampled: Vec<_> = recipes
-        .iter()
-        .filter(|recipe| expected_dir.join(&recipe.id).is_dir())
-        .collect();
-    assert!(
-        sampled.len() >= 5,
-        "cross-OS samples missing from {}",
-        expected_dir.display()
-    );
-    for recipe in sampled {
+    for id in sampled_apps() {
+        let recipe = recipes.get(&id).unwrap();
         let root = ctx.resolve(recipe.location(ctx.os()).unwrap()).unwrap();
         let restored = recipe.collect_files(&root).unwrap();
         let expected = files_under(&expected_dir.join(&recipe.id));
