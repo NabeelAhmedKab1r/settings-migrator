@@ -7,3 +7,4 @@ node_modules/
 /app/e2e/ui/screenshots
 /app/e2e/ui/report
 /app/e2e/ui/results
+/app/e2e/app/logs

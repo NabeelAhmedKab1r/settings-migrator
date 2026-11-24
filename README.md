@@ -63,7 +63,7 @@ npm run tauri build                        # build installers into target/releas
 
 `app/e2e/` holds tests that drive the app and write settings files, so they run only in CI, never on your own computer:
 
-- **Real-app tests** (`e2e/app`, Windows runner): WebdriverIO and tauri-driver drive the built app through saving, the secret review, the restore preview, restoring and undo, checking the files on disk after each step.
+- **Real-app tests** (`e2e/app`, Windows runner): WebdriverIO and tauri-driver drive the built app through saving, the secret review, the restore preview, restoring and undo, checking the files on disk after each step. It gives up within a few minutes if the app won't start, and uploads the driver, app and WebdriverIO logs as the `real-app-logs-windows` artifact. For now it, and the cross-OS app test, may fail without failing CI.
 - **UI tests** (`e2e/ui`, both runners): Playwright goes through every screen and error state (an app left open, a possible secret, files changed since the preview), with the engine scripted. Screenshots of every screen are uploaded as the `ui-screenshots-webkit` and `ui-screenshots-chromium` artifacts.
 - **Cross-OS app test:** the settings file the real app saves on Windows is restored with the command-line tool on macOS and checked file by file.
 

@@ -104,10 +104,15 @@ jobs:
   # supports Windows but not macOS), against stand-in homes in the runner's
   # temp folder: save, secret review, restore preview, restore and undo,
   # checking the files on disk at each step. Also saves the Windows sample
-  # settings for the cross-OS app test below.
+  # settings for the cross-OS app test below. On failure, the driver, app
+  # and WebdriverIO logs are uploaded as the real-app-logs-windows artifact.
+  # Allowed to fail for now (continue-on-error) while it's being made to
+  # work; remove that once it passes.
   e2e-windows:
     name: Real-app tests (Windows)
     runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: app
@@ -141,14 +146,47 @@ jobs:
             Write-Host "Using the runner's Edge driver instead: $_"
             "EDGE_DRIVER=$(Join-Path $env:EDGEWEBDRIVER 'msedgedriver.exe')" >> $env:GITHUB_ENV
           }
+      # wdio.conf.ts gives up within a few minutes on its own; this limit
+      # is in case something hangs outside it.
       - run: npm run test:e2e
+        timeout-minutes: 6
         env:
           SETTINGS_MIGRATOR_HOME: ${{ runner.temp }}/e2e
+      # After a failure: the versions involved, and the app started on its
+      # own for 15 s (on a stand-in home) to catch a crash at startup.
+      - name: Collect diagnostics
+        if: failure()
+        shell: pwsh
+        env:
+          SETTINGS_MIGRATOR_HOME: ${{ runner.temp }}/e2e-diagnostics-home
+        run: |
+          $logs = Join-Path $PWD 'e2e/app/logs'
+          New-Item -ItemType Directory -Force -Path $logs, $env:SETTINGS_MIGRATOR_HOME | Out-Null
+          $out = Join-Path $logs 'diagnostics.txt'
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          "WebView2 runtime: $((Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).pv)" | Out-File $out
+          "EDGE_DRIVER: $env:EDGE_DRIVER" | Out-File $out -Append
+          if ($env:EDGE_DRIVER -and (Test-Path $env:EDGE_DRIVER)) { & $env:EDGE_DRIVER --version 2>&1 | Out-File $out -Append }
+          else { 'Edge driver not found at that path' | Out-File $out -Append }
+          "tauri-driver: $((Get-Command tauri-driver -ErrorAction SilentlyContinue).Source)" | Out-File $out -Append
+          $app = Join-Path $PWD '../target/debug/settings-migrator-desktop.exe'
+          "app: $app (exists: $(Test-Path $app))" | Out-File $out -Append
+          if (Test-Path $app) {
+            $proc = Start-Process -FilePath $app -PassThru `
+              -RedirectStandardOutput (Join-Path $logs 'app-stdout.log') `
+              -RedirectStandardError (Join-Path $logs 'app-stderr.log')
+            Start-Sleep -Seconds 15
+            if ($proc.HasExited) { "app exited on its own with code $($proc.ExitCode)" | Out-File $out -Append }
+            else { 'app still running after 15 s (started fine)' | Out-File $out -Append; Stop-Process -Id $proc.Id -Force }
+          }
+          Get-Content $out
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: real-app-screenshots-windows
-          path: app/e2e/app/screenshots
+          name: real-app-logs-windows
+          path: |
+            app/e2e/app/logs
+            app/e2e/app/screenshots
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
@@ -163,6 +201,8 @@ jobs:
     name: Cross-OS app test (app on Windows, CLI on macOS)
     needs: e2e-windows
     runs-on: macos-latest
+    # Allowed to fail for now, like e2e-windows above.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

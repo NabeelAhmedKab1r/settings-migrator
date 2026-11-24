@@ -18,6 +18,11 @@ export default defineConfig({
   globalSetup: "./global-setup.ts",
   forbidOnly: true,
   retries: 0,
+  // The first test on a Windows runner pays for a cold browser start and a
+  // cold first page load (over 30 s together in CI run #11), so allow more
+  // than the 30 s / 5 s defaults.
+  timeout: 90_000,
+  expect: { timeout: 15_000 },
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
   outputDir: "results",
   use: {

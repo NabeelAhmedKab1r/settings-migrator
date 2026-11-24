@@ -14,6 +14,9 @@ export const WINDOWS_SAMPLE = join(repo, "crates/engine/tests/fixtures/cross-os/
 /** Screenshots, uploaded by CI as an artifact. */
 export const SCREENSHOTS = join(repo, "app/e2e/app/screenshots");
 
+/** Logs from tauri-driver, the Edge driver and WebdriverIO, uploaded by CI as an artifact. */
+export const LOGS = join(repo, "app/e2e/app/logs");
+
 /** The built app, from `npm run tauri -- build --debug --no-bundle`. */
 export const APP_BINARY = join(repo, "target/debug/settings-migrator-desktop.exe");
 
