@@ -101,4 +101,4 @@ In the description, say which app versions you checked the paths against, on whi
 
 ## Changing the engine, command line or app
 
-The layout is in the [README](README.md#layout). Run the checks above, plus `npm test` and `npm run build` in `app/` for front-end changes. Every command that writes files needs a dry-run option, and every restore must back up what it replaces first.
+The layout is in the [development guide](docs/DEVELOPMENT.md#layout). Run the checks above, plus `npm test` and `npm run build` in `app/` for front-end changes. Every command that writes files needs a dry-run option, and every restore must back up what it replaces first.

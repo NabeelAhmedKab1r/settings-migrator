@@ -1,102 +1,150 @@
+<div align="center">
+
 # Settings Migrator
 
 **Clean computer, your settings, any OS.**
 
-An open-source desktop app and command-line tool that moves your app settings to a new computer, including between Windows and Mac. Settings are captured into one portable bundle file, previewed before anything is written, and restored with an undo backup. Secrets (passwords, tokens, session cookies) are never copied.
+Moves your app settings to a new computer, even from Windows to Mac or Mac to Windows.<br>
+Free and open source. Nothing leaves your computer.
 
-> **Status:** early development. Capture and restore work for the 30 apps below, on the same OS or between Windows and Mac where the app allows it, in the desktop app or from the command line. There are no installers yet; build it from source (below).
+[![CI](https://github.com/NabeelAhmedKab1r/settings-migrator/actions/workflows/ci.yml/badge.svg)](https://github.com/NabeelAhmedKab1r/settings-migrator/actions/workflows/ci.yml)
+[![Licence: Apache 2.0](https://img.shields.io/badge/licence-Apache%202.0-blue.svg)](LICENSE)
+![Platforms: Windows | macOS](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-lightgrey.svg)
 
-## Supported apps
+<!-- TODO: record docs/demo.gif, a Windows → Mac restore in the desktop app. -->
+<img src="docs/demo.gif" alt="Restoring settings saved on Windows onto a Mac" width="720">
 
-| Group | Apps | Between Windows and Mac |
-| --- | --- | --- |
-| Code editors | VS Code, Cursor, Sublime Text, JetBrains IDEs, Zed | Yes. VS Code and Cursor shortcuts switch Ctrl and Cmd; Sublime keeps a key file per OS; JetBrains and Zed shortcuts are copied as they are |
-| Dev tools | Git, SSH config (never keys), npm config, Docker Desktop | Yes, except Docker Desktop (same OS only) |
-| Notes | Obsidian (app settings, not vaults) | Yes |
-| Browsers | Firefox, Chrome, Edge, Brave: bookmarks only | Yes |
-| Media and creative | OBS Studio, VLC, Blender, GIMP, Inkscape, Audacity | Yes |
-| Terminals and shells | Windows Terminal (Windows), iTerm2 (Mac), WezTerm, Alacritty, PowerShell profile, zsh, bash, Starship | WezTerm, Alacritty and Starship yes; shell scripts and single-OS terminals same OS only |
-| Text editors | Vim, Neovim | Yes |
+</div>
 
-Each app's recipe in [`recipes/`](recipes) says exactly which files are saved and which are left out. Browser extension lists come later. Want another app? See [CONTRIBUTING.md](CONTRIBUTING.md): a new recipe takes under an hour.
+## The problem
 
-## The desktop app
+Copying your files to a new computer is easy. Getting your apps set up again isn't: your editor's theme and shortcuts, your terminal, your Git setup, your OBS scenes. That takes hours of clicking through settings, and switching between Windows and Mac makes it worse.
 
-1. On your old computer, choose **Save settings from this computer**. The app finds your apps, you pick which ones to bring, and it saves one settings file. If a file looks like it holds a password or key, it asks first; leaving the file out is the default.
-2. Copy that file to your new computer.
-3. There, choose **Put settings on this computer** and pick the file. You see every change file by file before anything is written, including what was adjusted for Windows or Mac and anything that couldn't be. Your current settings are backed up first.
-4. Changed your mind? **Undo** puts everything back as it was.
+Settings Migrator saves those settings into one file and puts them back on the new computer, adjusting them for the new OS as it goes. Ctrl shortcuts become Cmd, and a folder like `C:\Users\you\Videos` becomes `~/Movies`. Anything it can't translate, such as a path on another drive, is flagged in the preview and never quietly dropped.
 
-## The command line
+## Why it's different
+
+| | Settings Migrator | [Endstate](https://github.com/Artexis10/endstate) | [Mackup](https://github.com/lra/mackup) | [Windows Backup](https://support.microsoft.com/help/17128) | [Migration Assistant](https://support.apple.com/102565) |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| Windows | ✅ | ✅ | ❌ | ✅ | ❌ ¹ |
+| macOS | ✅ | ❌ | ✅ | ❌ | ✅ |
+| Windows ↔ Mac | ✅ | ❌ | ❌ | ❌ | Partly ¹ |
+| Third-party app settings | ✅ | ✅ | ✅ | ❌ ² | Mac to Mac |
+| Clean install (not a clone) | ✅ | ✅ | ✅ | ✅ | ❌ ³ |
+| Desktop app | ✅ | ✅ | ❌ | ✅ | ✅ |
+
+¹ Migration Assistant brings files and some settings (such as email accounts, contacts and bookmarks) from a Windows PC to a Mac, one way only.<br>
+² Windows Backup saves Windows' own settings and your list of apps, not the apps' settings.<br>
+³ Between Macs, it [copies your whole user account, apps and settings](https://support.apple.com/102613) from the old Mac.
+
+<sub>As of November 2026. Corrections welcome: [open an issue](https://github.com/NabeelAhmedKab1r/settings-migrator/issues).</sub>
+
+## How it works
+
+1. **Save.** On your old computer, choose *Save settings from this computer*. Pick the apps to bring, and it saves one settings file.
+2. **Move.** Copy that file to your new computer: a USB stick, a shared folder, anything.
+3. **Preview.** Choose *Put settings on this computer* and pick the file. You see every change, file by file, before anything is written, including what was adjusted for the new OS.
+4. **Restore.** Your current settings are backed up first. Changed your mind? *Undo* puts everything back as it was.
+
+## Your secrets stay secret
+
+- **Never copied:** passwords, tokens, cookies, sign-in data and private keys. Known secret files, like SSH keys and browser password stores, are blocked whatever an app's recipe says.
+- **Scanned first:** every other file is checked for anything that looks like a password or key. If a file is flagged, you decide, and leaving it out is the default.
+- **No account, no cloud:** the settings file is saved on your computer, and you move it yourself. Nothing is uploaded anywhere.
+
+## Supported apps (30)
+
+| Group | Apps | Windows ↔ Mac |
+| --- | --- | :---: |
+| Code editors | VS Code, Cursor, Sublime Text, JetBrains IDEs, Zed | ✅ |
+| Dev tools | Git, SSH config (never keys), npm config | ✅ |
+| | Docker Desktop | Same OS only |
+| Notes | Obsidian (app settings, not your vaults) | ✅ |
+| Browsers | Firefox, Chrome, Edge, Brave (bookmarks only) | ✅ |
+| Media and creative | OBS Studio, VLC, Blender, GIMP, Inkscape, Audacity | ✅ |
+| Terminals | WezTerm, Alacritty, Starship prompt | ✅ |
+| | Windows Terminal (Windows), iTerm2 (Mac) | One OS only |
+| Shells | PowerShell profile, bash, zsh (Mac) | Same OS only |
+| Text editors | Vim, Neovim | ✅ |
+
+A few notes:
+
+- Shortcuts switch between Ctrl and Cmd for VS Code and Cursor. Sublime Text keeps a separate shortcut file for each OS. JetBrains, Zed and the other apps' shortcuts are copied as they are.
+- After restoring Firefox, open it and choose *Bookmarks → Manage bookmarks → Import and Backup → Restore* to load your bookmarks.
+
+Each app's recipe in [`recipes/`](recipes) says exactly which files are saved and which are left out. Want another app? A new recipe takes under an hour: see [CONTRIBUTING.md](CONTRIBUTING.md), or pick a [good first issue](https://github.com/NabeelAhmedKab1r/settings-migrator/labels/good%20first%20issue).
+
+## Install
+
+> **Early release.** It always backs up before changing anything and can undo every restore, but try it with a few apps first, and please [report anything odd](https://github.com/NabeelAhmedKab1r/settings-migrator/issues).
+
+Installers for Windows and macOS are coming with the first release. Until then, you can [build it from source](docs/DEVELOPMENT.md#building).
+
+## Command line
+
+Everything the desktop app does also works from a terminal:
 
 ```sh
-settings-migrator scan                              # what can be captured on this computer
-settings-migrator capture -o settings.zip --dry-run  # list the files, write nothing
-settings-migrator capture -o settings.zip            # make the bundle
-settings-migrator restore settings.zip --dry-run     # see what would change, write nothing
-settings-migrator restore settings.zip               # show a diff of every file, ask, back up, restore
-settings-migrator undo --dry-run                     # see what undo would put back
-settings-migrator undo                               # put back what the last restore changed
+settings-migrator scan                             # which apps have settings on this computer
+settings-migrator capture -o settings.zip          # save them into one file
+settings-migrator restore settings.zip --dry-run   # see what would change, write nothing
+settings-migrator restore settings.zip             # show every change, ask, back up, restore
+settings-migrator undo                             # put back what the last restore changed
 ```
 
-Add `--app vscode` (repeatable) to work on some apps only.
+Add `--app vscode` (repeatable) to work on some apps only, and when capture flags a possible secret, run it again with `--skip APP/FILE` to leave that file out or `--allow APP/FILE` if you've checked it holds no secret.
 
-Restore shows a diff of every file it would change and asks before writing (`--yes` skips the question). It won't run while an app it changes is open, because an open app can overwrite its settings when it quits. It backs up every file it changes before writing, under `~/Library/Application Support/settings-migrator/undo` on macOS and `%LOCALAPPDATA%\settings-migrator\undo` on Windows. Known secret files (credentials, private keys, cookie and password stores) are never captured. Every other file is scanned before the bundle is written: for known token formats, for any value under a setting named like a password, secret, token or API key (apart from known-safe values such as `osxkeychain` or `${env:NAME}`), and for random-looking strings; if anything is flagged, capture stops and lists it (without printing the secret). Run it again with `--skip APP/FILE` to leave a file out, or `--allow APP/FILE` if you've checked it holds no secret.
+<details>
+<summary><b>What changes between Windows and Mac</b></summary>
 
-### Moving between Windows and Mac
+Restore a file made on the other OS the same way. Each file is translated as its recipe allows, and the preview lists what changed:
 
-Restore a bundle made on the other OS the same way. Each file is translated as its recipe allows, and the preview lists what changed:
-
-- **Shortcuts:** Ctrl becomes Cmd going to a Mac, and back going to Windows. Alt and Option keep their name, since VS Code calls both `alt`.
+- **Shortcuts:** Ctrl becomes Cmd going to a Mac, and back going to Windows (VS Code and Cursor). Alt and Option keep their name, since VS Code calls both `alt`.
 - **Paths inside settings:** a path in your old home folder moves to the same place in your new one, such as `C:\Users\Sam\Videos` to `~/Movies`.
 - **Line endings:** CRLF on Windows, LF on Mac, for the plain-text config files where the recipe asks for it.
 
-Anything that can't be translated is marked `!` in the preview and restored unchanged, never dropped. Examples are a path outside your home folder (`D:\Vaults`, `/Volumes/Backup`), a shortcut that uses the Windows key, a shortcut the other OS keeps for itself (Cmd+Tab), and files only one OS uses. Settings that each OS usually sets differently, such as Git's `core.autocrlf`, are marked too, so you can check them.
+Anything that can't be translated is marked `!` in the preview and restored unchanged, never dropped. Examples are a path outside your home folder (`D:\Vaults`, `/Volumes/Backup`), a shortcut that uses the Windows key, and a shortcut the other OS keeps for itself (Cmd+Tab). Settings that each OS usually sets differently, such as Git's `core.autocrlf`, are marked too, so you can check them. Files only one OS uses are listed as skipped, with the reason.
 
-## Building
+</details>
 
-Requires [Rust](https://rustup.rs) (1.80 or later for the engine and command line, 1.90 for the desktop app) and, for the desktop app, [Node.js](https://nodejs.org) 22 or later.
+## FAQ
 
-```sh
-cargo build --workspace
-SETTINGS_MIGRATOR_HOME="$TMPDIR/settings-migrator-tests" cargo test --workspace
-cargo run -p settings-migrator-cli
-```
+<details>
+<summary><b>Why not Discord, Spotify or Slack?</b></summary>
 
-The recipe tests (`crates/engine/tests/recipes.rs`) write fake homes only inside the folder `SETTINGS_MIGRATOR_HOME` names, which must be a new folder in your temp folder; they refuse to run without it. CI sets it to a folder in the runner's temp folder.
+Their settings sync through your account, so they come back when you sign in. What they keep on disk is mostly sign-in state, which Settings Migrator never copies.
 
-The desktop app is a [Tauri](https://tauri.app) app with a React and TypeScript front end, in `app/`:
+</details>
 
-```sh
-cd app
-npm ci
-npm run tauri dev                          # run it, reloading as you edit
-npm test                                   # front-end tests
-npm run tauri build                        # build installers into target/release/bundle
-```
+<details>
+<summary><b>Does it install my apps too?</b></summary>
 
-### Tests that run only in GitHub Actions
+Not yet. Install the apps on the new computer, then restore their settings. Installing apps for you (with WinGet on Windows and Homebrew on Mac) is planned.
 
-`app/e2e/` holds tests that drive the app and write settings files, so they run only in CI, never on your own computer:
+</details>
 
-- **Real-app tests** (`e2e/app`, Windows runner): WebdriverIO and tauri-driver drive the built app through saving, the secret review, the restore preview, restoring and undo, checking the files on disk after each step. It gives up within a few minutes if the app won't start, and uploads the driver, app and WebdriverIO logs as the `real-app-logs-windows` artifact. For now it, and the cross-OS app test, may fail without failing CI.
-- **UI tests** (`e2e/ui`, both runners): Playwright goes through every screen and error state (an app left open, a possible secret, files changed since the preview), with the engine scripted. Screenshots of every screen are uploaded as the `ui-screenshots-webkit` and `ui-screenshots-chromium` artifacts.
-- **Cross-OS app test:** the settings file the real app saves on Windows is restored with the command-line tool on macOS and checked file by file.
+<details>
+<summary><b>Is it safe to use on my real computer?</b></summary>
 
-Each refuses to start unless it's running in GitHub Actions with `SETTINGS_MIGRATOR_HOME` set to a folder inside the runner's temp folder that isn't, and doesn't hold, a real home folder (`app/e2e/guard.ts`).
+It's built so nothing changes without you seeing it first:
 
-To try things without touching your real settings, give it a stand-in home folder: `--home DIR` on the command line (hidden from `--help`, since it's for testing), or `SETTINGS_MIGRATOR_HOME=DIR` for the desktop app, which then shows a test-mode banner. Restore and undo then skip the open-app check. `crates/engine/tests/fixtures/cross-os/` has sample Windows and Mac home folders to try it on.
+- **Preview:** every change is shown file by file before anything is written.
+- **Open apps:** it won't restore while an app it would change is open, because an open app can overwrite its settings when it quits.
+- **Backup:** every file it changes is backed up first.
+- **Undo:** one click (or `settings-migrator undo`) puts everything back as it was.
 
-## Layout
+</details>
 
-| Path | What it is |
-| --- | --- |
-| `crates/engine` | Library that loads recipes and captures, translates and restores settings |
-| `crates/cli` | `settings-migrator` command-line tool built on the engine |
-| `app/` | Desktop app: React screens in `app/src`, Tauri commands calling the engine in `app/src-tauri` |
-| `recipes/` | One YAML recipe per supported app |
-| `recipes/samples/` | Made-up settings for each recipe, which its test saves and restores |
-| `contributing/` | Templates for a new recipe and its samples (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+<details>
+<summary><b>What about Linux?</b></summary>
+
+Linux is planned. Until then, [Mackup](https://github.com/lra/mackup) works well there.
+
+</details>
+
+## Contributing
+
+New app recipes are the most useful contribution, and the guide in [CONTRIBUTING.md](CONTRIBUTING.md) walks you through one in under an hour. To build, test or change the app itself, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Licence
 
